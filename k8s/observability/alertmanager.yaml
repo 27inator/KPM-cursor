@@ -1,0 +1,398 @@
+# ====================================
+# KMP SUPPLY CHAIN - ALERTMANAGER
+# Advanced alerting and notifications
+# ====================================
+
+# ConfigMap for AlertManager configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: kmp-observability
+  labels:
+    app: alertmanager
+data:
+  alertmanager.yml: |
+    global:
+      smtp_smarthost: 'localhost:587'
+      smtp_from: 'alerts@kmp-supply-chain.com'
+      slack_api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+
+    route:
+      group_by: ['alertname', 'cluster', 'service']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 1h
+      receiver: 'kmp-alerts'
+      routes:
+      - match:
+          severity: critical
+        receiver: 'kmp-critical-alerts'
+        group_wait: 0s
+        repeat_interval: 30m
+      - match:
+          alertname: BlockchainTransactionFailed
+        receiver: 'blockchain-alerts'
+        group_wait: 0s
+        repeat_interval: 15m
+      - match:
+          alertname: SupplyChainEventProcessingDelay
+        receiver: 'supply-chain-alerts'
+        group_wait: 5s
+        repeat_interval: 1h
+
+    receivers:
+    - name: 'kmp-alerts'
+      email_configs:
+      - to: 'team@kmp-supply-chain.com'
+        subject: 'KMP Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt }}
+          {{ end }}
+      slack_configs:
+      - channel: '#kmp-alerts'
+        title: 'KMP Supply Chain Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        color: 'warning'
+
+    - name: 'kmp-critical-alerts'
+      email_configs:
+      - to: 'team@kmp-supply-chain.com,oncall@kmp-supply-chain.com'
+        subject: 'CRITICAL KMP Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        body: |
+          🚨 CRITICAL ALERT 🚨
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Instance: {{ .Labels.instance }}
+          Time: {{ .StartsAt }}
+          {{ end }}
+      slack_configs:
+      - channel: '#kmp-critical'
+        title: '🚨 CRITICAL KMP Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        color: 'danger'
+
+    - name: 'blockchain-alerts'
+      email_configs:
+      - to: 'blockchain-team@kmp-supply-chain.com'
+        subject: 'Blockchain Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        body: |
+          🔗 Blockchain Alert
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Transaction: {{ .Labels.transaction_id }}
+          Time: {{ .StartsAt }}
+          {{ end }}
+      slack_configs:
+      - channel: '#blockchain-alerts'
+        title: '🔗 Blockchain Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        color: 'warning'
+
+    - name: 'supply-chain-alerts'
+      email_configs:
+      - to: 'supply-chain-team@kmp-supply-chain.com'
+        subject: 'Supply Chain Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        body: |
+          📦 Supply Chain Alert
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Product: {{ .Labels.product_id }}
+          Company: {{ .Labels.company_id }}
+          Time: {{ .StartsAt }}
+          {{ end }}
+      slack_configs:
+      - channel: '#supply-chain-alerts'
+        title: '📦 Supply Chain Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        color: 'warning'
+
+    inhibit_rules:
+    - source_match:
+        severity: 'critical'
+      target_match:
+        severity: 'warning'
+      equal: ['alertname', 'cluster', 'service']
+
+---
+# ConfigMap for Prometheus alerting rules
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kmp-alerting-rules
+  namespace: kmp-observability
+  labels:
+    app: prometheus
+data:
+  kmp-alerts.yml: |
+    groups:
+    - name: kmp-supply-chain-alerts
+      rules:
+      # System Health Alerts
+      - alert: KMPServiceDown
+        expr: up{job=~"kmp-.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "KMP service {{ $labels.job }} is down"
+          description: "Service {{ $labels.job }} on instance {{ $labels.instance }} has been down for more than 1 minute."
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is above 90% on instance {{ $labels.instance }}."
+
+      - alert: HighCPUUsage
+        expr: 100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is above 90% on instance {{ $labels.instance }}."
+
+      # Database Alerts
+      - alert: DatabaseConnectionFailure
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "PostgreSQL database connection failed for more than 1 minute."
+
+      - alert: DatabaseHighConnections
+        expr: pg_stat_database_numbackends / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High database connections"
+          description: "Database connections are above 80% of maximum."
+
+      # Supply Chain Specific Alerts
+      - alert: SupplyChainEventProcessingDelay
+        expr: increase(supply_chain_events_processing_duration_seconds[5m]) > 30
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Supply chain event processing delay"
+          description: "Supply chain events are taking longer than 30 seconds to process."
+
+      - alert: SupplyChainEventFailureRate
+        expr: rate(supply_chain_events_failed_total[5m]) > 0.1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High supply chain event failure rate"
+          description: "Supply chain event failure rate is above 10% over the last 5 minutes."
+
+      # Blockchain Alerts
+      - alert: BlockchainTransactionFailed
+        expr: increase(blockchain_transactions_failed_total[5m]) > 0
+        for: 0s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Blockchain transaction failed"
+          description: "One or more blockchain transactions have failed in the last 5 minutes."
+
+      - alert: BlockchainConfirmationDelay
+        expr: blockchain_transaction_confirmation_duration_seconds > 600
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Blockchain confirmation delay"
+          description: "Blockchain transactions are taking longer than 10 minutes to confirm."
+
+      - alert: KaspaNodeDisconnected
+        expr: kaspa_node_connected == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kaspa node disconnected"
+          description: "Connection to Kaspa node has been lost for more than 1 minute."
+
+      # API Alerts
+      - alert: HighAPILatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API latency"
+          description: "95th percentile API latency is above 2 seconds."
+
+      - alert: HighAPIErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High API error rate"
+          description: "API error rate is above 5% over the last 5 minutes."
+
+      # Storage Alerts
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}"
+          description: "Disk space is below 10% on instance {{ $labels.instance }}."
+
+      - alert: PayloadStorageFailure
+        expr: increase(payload_storage_failures_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Payload storage failure"
+          description: "Payload storage operations are failing."
+
+---
+# Service Account for AlertManager
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: alertmanager
+  namespace: kmp-observability
+  labels:
+    app: alertmanager
+
+---
+# Service for AlertManager
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  namespace: kmp-observability
+  labels:
+    app: alertmanager
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 9093
+    targetPort: 9093
+    protocol: TCP
+  selector:
+    app: alertmanager
+
+---
+# Deployment for AlertManager
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  namespace: kmp-observability
+  labels:
+    app: alertmanager
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: alertmanager
+  template:
+    metadata:
+      labels:
+        app: alertmanager
+    spec:
+      serviceAccountName: alertmanager
+      containers:
+      - name: alertmanager
+        image: prom/alertmanager:v0.26.0
+        imagePullPolicy: IfNotPresent
+        args:
+        - --config.file=/etc/alertmanager/alertmanager.yml
+        - --storage.path=/alertmanager
+        - --web.external-url=http://alertmanager.kmp-supply-chain.local
+        - --web.route-prefix=/
+        - --cluster.listen-address=0.0.0.0:9094
+        - --log.level=info
+        ports:
+        - name: http
+          containerPort: 9093
+          protocol: TCP
+        - name: cluster
+          containerPort: 9094
+          protocol: TCP
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        volumeMounts:
+        - name: config
+          mountPath: /etc/alertmanager
+        - name: data
+          mountPath: /alertmanager
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 9093
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9093
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      volumes:
+      - name: config
+        configMap:
+          name: alertmanager-config
+      - name: data
+        emptyDir: {}
+
+---
+# Ingress for AlertManager UI
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: alertmanager-ui
+  namespace: kmp-observability
+  labels:
+    app: alertmanager
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - alertmanager.kmp-supply-chain.local
+    secretName: alertmanager-tls
+  rules:
+  - host: alertmanager.kmp-supply-chain.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: alertmanager
+            port:
+              number: 9093 

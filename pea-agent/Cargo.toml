@@ -1,0 +1,53 @@
+[package]
+name = "pea-agent"
+version = "0.1.0"
+edition = "2021"
+authors = ["KMP Team"]
+description = "KMP Per-Device Portable Edge Agent"
+license = "MIT"
+repository = "https://github.com/kmp/pea-agent"
+keywords = ["kaspa", "blockchain", "supply-chain", "provenance", "scanner"]
+categories = ["cryptography", "hardware-support", "network-programming"]
+
+[[bin]]
+name = "pea-agent"
+path = "src/main.rs"
+
+[features]
+default = []
+# TPM integration when TSS stack available
+tpm = []
+# Scanner backends (optional)
+scanner-serial = ["serialport"]
+scanner-hid = ["hidapi"]
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+anyhow = "1.0"
+thiserror = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+tokio = { version = "1.37", features = ["rt-multi-thread", "macros", "time"] }
+ed25519-dalek = { version = "1.0", features = ["std"] }
+rand = "0.7"
+sha2 = "0.10"
+aes-gcm = { version = "0.10", features = ["aes"] }
+aead = "0.5"
+base64 = "0.22"
+hkdf = "0.12"
+whoami = "1.5"
+directories = "5.0"
+chrono = { version = "0.4", features = ["serde"] }
+hex = "0.4"
+cfg-if = "1.0"
+keyring = "2.3"
+# Optional scanner deps
+serialport = { version = "4.3", optional = true }
+hidapi = { version = "2.6", optional = true }
+hmac = "0.12"
+uuid = { version = "1.8", features = ["v4"] }
+
+[target.'cfg(feature="tpm")'.dependencies]
+# Placeholder for TPM stack
+# tss-esapi = "7" 

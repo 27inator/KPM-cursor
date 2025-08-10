@@ -1,0 +1,180 @@
+# ====================================
+# KMP SUPPLY CHAIN - PRODUCTION VALUES  
+# Enterprise-grade production configuration
+# ====================================
+
+# Production global settings
+global:
+  imageRegistry: "your-registry.com"
+  storageClass: "fast-ssd"
+
+# Production environment
+app:
+  environment: production
+
+# Message Bus - high availability
+messageBus:
+  replicaCount: 5
+  
+  image:
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 70
+  
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/rate-limit: "1000"
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    hosts:
+      - host: api.kmp-supply-chain.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: kmp-api-tls-prod
+        hosts:
+          - api.kmp-supply-chain.com
+  
+  env:
+    NODE_ENV: production
+    LOG_LEVEL: warn
+
+# Kaspa Broadcaster - production resources
+kaspaBroadcaster:
+  replicaCount: 2
+  
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# PostgreSQL - high availability with replication
+postgresql:
+  architecture: replication
+  
+  auth:
+    postgresPassword: "CHANGE_THIS_IN_PRODUCTION"
+    password: "CHANGE_THIS_IN_PRODUCTION"
+  
+  primary:
+    persistence:
+      size: 100Gi
+      storageClass: "fast-ssd"
+    
+    resources:
+      requests:
+        memory: "2Gi"
+        cpu: "1000m"
+      limits:
+        memory: "4Gi"
+        cpu: "2000m"
+  
+  readReplicas:
+    replicaCount: 2
+    persistence:
+      size: 100Gi
+      storageClass: "fast-ssd"
+    resources:
+      requests:
+        memory: "1Gi"
+        cpu: "500m"
+      limits:
+        memory: "2Gi"
+        cpu: "1000m"
+
+# Redis - high availability cluster
+redis:
+  architecture: replication
+  
+  master:
+    persistence:
+      size: 20Gi
+      storageClass: "fast-ssd"
+    
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "200m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+  
+  replica:
+    replicaCount: 2
+    persistence:
+      size: 20Gi
+      storageClass: "fast-ssd"
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "200m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+
+# Monitoring - production-grade
+monitoring:
+  prometheus:
+    persistence:
+      size: 50Gi
+      storageClass: "fast-ssd"
+    resources:
+      requests:
+        memory: "2Gi"
+        cpu: "500m"
+      limits:
+        memory: "4Gi"
+        cpu: "1000m"
+  
+  grafana:
+    adminPassword: "CHANGE_THIS_IN_PRODUCTION"
+    persistence:
+      size: 10Gi
+      storageClass: "fast-ssd"
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "200m"
+
+# Storage - high-performance volumes
+storage:
+  persistence:
+    size: 50Gi
+    storageClass: "fast-ssd"
+
+# Security - production security (CHANGE ALL SECRETS!)
+security:
+  networkPolicies:
+    enabled: true
+  
+  podSecurityPolicy:
+    enabled: true
+  
+  secrets:
+    jwtSecret: "CHANGE_TO_STRONG_RANDOM_KEY_IN_PRODUCTION"
+    walletMnemonic: "CHANGE_TO_YOUR_PRODUCTION_MNEMONIC"
+    walletAddress: "CHANGE_TO_YOUR_PRODUCTION_ADDRESS" 

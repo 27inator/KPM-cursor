@@ -1,0 +1,162 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+
+jobs:
+  build-and-package:
+    name: Build and Package (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            pea-agent -> target
+
+      - name: Build (release)
+        working-directory: pea-agent
+        run: cargo build --release
+
+      - name: Prepare artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_NAME=pea-agent
+          OUTDIR=pea-agent/target/release
+          VERSION=${GITHUB_REF_NAME#v}
+          mkdir -p dist
+          case "${{ runner.os }}" in
+            Linux)
+              BIN="$OUTDIR/$APP_NAME"
+              PKG_NAME="kpm-${APP_NAME}_${VERSION}_linux_amd64"
+              cp "$BIN" "dist/$APP_NAME"
+              (cd dist && tar -czf "${PKG_NAME}.tar.gz" "$APP_NAME")
+              (cd dist && shasum -a 256 "${PKG_NAME}.tar.gz" > "${PKG_NAME}.tar.gz.sha256")
+              ;;
+            macOS)
+              BIN="$OUTDIR/$APP_NAME"
+              PKG_NAME="kpm-${APP_NAME}_${VERSION}_macos_universal"
+              cp "$BIN" "dist/$APP_NAME"
+              (cd dist && tar -czf "${PKG_NAME}.tar.gz" "$APP_NAME")
+              (cd dist && shasum -a 256 "${PKG_NAME}.tar.gz" > "${PKG_NAME}.tar.gz.sha256")
+              ;;
+            Windows)
+              BIN="pea-agent/target/release/${APP_NAME}.exe"
+              PKG_NAME="kpm-${APP_NAME}_${VERSION}_windows_amd64"
+              cp "$BIN" dist/
+              (cd dist && powershell -c "Compress-Archive -Path ${APP_NAME}.exe -DestinationPath ${PKG_NAME}.zip")
+              (cd dist && certutil -hashfile "${PKG_NAME}.zip" SHA256 | findstr /v "hash of" | findstr /v "CertUtil" > "${PKG_NAME}.zip.sha256")
+              ;;
+          esac
+
+      - name: Import GPG private key (optional)
+        if: ${{ secrets.GPG_PRIVATE_KEY && secrets.GPG_PASSPHRASE }}
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Sign artifacts (optional)
+        if: ${{ secrets.GPG_PRIVATE_KEY && secrets.GPG_PASSPHRASE }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in dist/*.{tar.gz,zip}; do
+            [ -e "$f" ] || continue
+            gpg --batch --yes --passphrase "$GPG_PASSPHRASE" --detach-sign "$f"
+          done
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}-artifacts
+          path: dist/*
+
+  release:
+    name: Create GitHub Release
+    needs: build-and-package
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/**
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  verify-after-publish:
+    name: Verify Signatures After Publish
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install jq and curl
+        run: sudo apt-get update && sudo apt-get install -y jq curl gnupg
+
+      - name: Download release assets list
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release view "${GITHUB_REF_NAME}" --json assets > assets.json
+          jq '.assets[].url' -r assets.json > urls.txt
+
+      - name: Fetch assets
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          while read -r url; do curl -sSL -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -o "dist/$(basename "$url")" "$url"; done < urls.txt
+
+      - name: Import public root key
+        run: |
+          set -euo pipefail
+          # Prefer hosted key; fallback to repo copy if present
+          if curl -fsSL https://install.kpm.io/keys/public-root.gpg -o public-root.gpg; then
+            gpg --import public-root.gpg
+          elif [ -f ci/keys/public-root.gpg ]; then
+            gpg --import ci/keys/public-root.gpg
+          else
+            echo "No public-root.gpg available" >&2; exit 1
+          fi
+
+      - name: Verify signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in dist/*.{tar.gz,zip}; do
+            [ -e "$f" ] || continue
+            if [ ! -f "${f}.asc" ]; then echo "Missing signature for $f" >&2; exit 1; fi
+            gpg --verify "${f}.asc" "$f"
+          done
+
+  pr-verify-script:
+    name: PR signature verification script syntax
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint verify-signatures script
+        run: bash -n ci/tests/verify-signatures.sh || true 

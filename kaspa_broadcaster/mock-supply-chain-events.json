@@ -1,0 +1,104 @@
+{
+  "mockEvents": [
+    {
+      "eventId": "evt_001",
+      "eventType": "PRODUCT_SCAN",
+      "productId": "PROD_ABC123",
+      "batchId": "BATCH_2024_001",
+      "companyId": "acme-manufacturing",
+      "facilityId": "PLANT_TX_001",
+      "location": {
+        "lat": 32.7767,
+        "lng": -96.7970,
+        "address": "Dallas, TX Manufacturing Plant"
+      },
+      "timestamp": "2025-01-27T18:30:00.000Z",
+      "scannerOperator": "operator_001",
+      "eventData": {
+        "qualityCheck": "PASSED",
+        "temperature": "72F",
+        "humidity": "45%",
+        "batchSize": 1000
+      },
+      "previousEventHash": null,
+      "eventHash": "0x1a2b3c4d5e6f7890abcdef1234567890"
+    },
+    {
+      "eventId": "evt_002", 
+      "eventType": "LOGISTICS_MOVEMENT",
+      "productId": "PROD_ABC123",
+      "batchId": "BATCH_2024_001",
+      "companyId": "fast-logistics",
+      "facilityId": "WAREHOUSE_CA_002",
+      "location": {
+        "lat": 34.0522,
+        "lng": -118.2437,
+        "address": "Los Angeles, CA Distribution Center"
+      },
+      "timestamp": "2025-01-27T22:15:00.000Z",
+      "scannerOperator": "operator_002",
+      "eventData": {
+        "transportType": "TRUCK",
+        "vehicleId": "TRK_001",
+        "temperature": "68F",
+        "estimatedArrival": "2025-01-28T10:00:00.000Z"
+      },
+      "previousEventHash": "0x1a2b3c4d5e6f7890abcdef1234567890",
+      "eventHash": "0x2b3c4d5e6f7890abcdef12345678901a"
+    },
+    {
+      "eventId": "evt_003",
+      "eventType": "RETAIL_VERIFICATION", 
+      "productId": "PROD_ABC123",
+      "batchId": "BATCH_2024_001",
+      "companyId": "luxury-jewelers-inc",
+      "facilityId": "STORE_NY_001",
+      "location": {
+        "lat": 40.7128,
+        "lng": -74.0060,
+        "address": "New York, NY Flagship Store"
+      },
+      "timestamp": "2025-01-28T14:30:00.000Z",
+      "scannerOperator": "sales_associate_003",
+      "eventData": {
+        "verificationResult": "AUTHENTIC",
+        "customerPresent": true,
+        "salePrice": "$2,499.99",
+        "warrantyActivated": true
+      },
+      "previousEventHash": "0x2b3c4d5e6f7890abcdef12345678901a",
+      "eventHash": "0x3c4d5e6f7890abcdef12345678901a2b"
+    }
+  ],
+  "mockCompactEvents": [
+    {
+      "evt": "evt_001",
+      "type": "SCAN",
+      "prod": "PROD_ABC123",
+      "batch": "BATCH_2024_001", 
+      "company": "acme-manufacturing",
+      "ts": 1706383800,
+      "hash": "0x1a2b3c4d5e6f7890abcdef1234567890"
+    },
+    {
+      "evt": "evt_002",
+      "type": "MOVE", 
+      "prod": "PROD_ABC123",
+      "batch": "BATCH_2024_001",
+      "company": "fast-logistics",
+      "ts": 1706397300,
+      "prev": "0x1a2b3c4d5e6f7890abcdef1234567890",
+      "hash": "0x2b3c4d5e6f7890abcdef12345678901a"
+    },
+    {
+      "evt": "evt_003",
+      "type": "VERIFY",
+      "prod": "PROD_ABC123", 
+      "batch": "BATCH_2024_001",
+      "company": "luxury-jewelers-inc",
+      "ts": 1706454600,
+      "prev": "0x2b3c4d5e6f7890abcdef12345678901a",
+      "hash": "0x3c4d5e6f7890abcdef12345678901a2b"
+    }
+  ]
+} 

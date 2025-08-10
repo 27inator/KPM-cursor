@@ -1,0 +1,165 @@
+#!/usr/bin/expect -f
+
+set timeout 60
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+# Command line arguments
+if {$argc != 4} {
+    puts "Usage: $argv0 <wallet_name> <wallet_password> <event_json> <company_address>"
+    puts "Example: $argv0 company-wallet password123 '{\"event\":\"SCAN\",\"product\":\"LW001\"}' kaspatest:qqnv..."
+    exit 1
+}
+
+set wallet_name [lindex $argv 0]
+set wallet_password [lindex $argv 1] 
+set event_json [lindex $argv 2]
+set company_address [lindex $argv 3]
+
+log_user 1
+
+puts "🔗 EMBEDDING OP_RETURN DATA ON KASPA"
+puts "===================================="
+puts "Wallet: $wallet_name"
+puts "Event: $event_json"
+puts "From: $company_address"
+puts "Data size: [string length $event_json] bytes"
+puts ""
+
+# Calculate estimated cost
+set data_bytes [string length $event_json]
+set estimated_mass [expr $data_bytes * 10 + 1000]  # 10 mass per byte + overhead
+set estimated_cost [expr $estimated_mass * 0.000001]  # 1 sompi per mass unit
+
+puts "💰 Estimated cost: ~$estimated_cost KAS"
+puts ""
+
+spawn $kaspa_cli
+expect "$ "
+
+puts "🔌 Connecting to node..."
+send "server 127.0.0.1:17210\r"
+expect "$ "
+
+send "connect\r"
+expect {
+    "Connected" {
+        puts "✅ Connected to Kaspa node!"
+    }
+    "Error" {
+        puts "❌ Connection failed"
+        exit 1
+    }
+}
+expect "$ "
+
+puts "🔑 Opening company wallet: $wallet_name"
+send "wallet open $wallet_name\r"
+expect "Enter wallet password:"
+send "$wallet_password\r"
+expect {
+    "$ " {
+        puts "✅ Wallet opened successfully!"
+    }
+    timeout {
+        puts "❌ Failed to open wallet"
+        exit 1
+    }
+}
+
+puts "💰 Checking wallet balance..."
+send "list\r"
+expect "$ "
+
+puts "📍 Getting wallet address..."
+send "address\r"
+expect "$ "
+
+puts ""
+puts "🔗 EMBEDDING OP_RETURN DATA..."
+puts "=============================="
+
+# Try different OP_RETURN syntaxes - kaspa-cli might have different commands
+puts "Method 1: Trying 'send' with OP_RETURN..."
+
+# First try: see if kaspa-cli supports OP_RETURN directly in send command
+send "help send\r"
+expect "$ "
+
+puts ""
+puts "Method 2: Trying raw transaction creation..."
+
+# Check for raw transaction commands
+send "help\r"
+expect "$ "
+
+puts ""
+puts "🧪 TESTING OP_RETURN EMBEDDING..."
+puts "================================="
+
+# Let's try sending a minimal amount with data
+# This might work if kaspa-cli supports data in transactions
+send "send 0.001 $company_address --data=\"$event_json\"\r"
+expect {
+    "Transaction submitted" {
+        set tx_id $expect_out(0,string)
+        puts "✅ OP_RETURN transaction submitted!"
+        puts "📋 Transaction ID captured"
+    }
+    "Invalid" {
+        puts "⚠️  Direct data embedding not supported in send command"
+    }
+    "Error" {
+        puts "⚠️  Error with data embedding"
+    }
+    "$ " {
+        puts "⚠️  Command completed but no clear success message"
+    }
+}
+
+puts ""
+puts "🔍 ALTERNATIVE: Testing raw transaction creation..."
+puts "================================================="
+
+# Try to find transaction creation commands
+send "help transaction\r"
+expect "$ "
+
+send "help create\r" 
+expect "$ "
+
+# Look for any OP_RETURN or data-related commands
+send "help | grep -i data\r"
+expect "$ "
+
+send "help | grep -i return\r"
+expect "$ "
+
+send "help | grep -i op\r"
+expect "$ "
+
+puts ""
+puts "📋 AVAILABLE COMMANDS ANALYSIS:"
+puts "==============================="
+puts "Checking what transaction options are available..."
+
+# Get full help to see all available commands
+send "help\r"
+expect "$ "
+
+puts ""
+puts "🚧 OP_RETURN EMBEDDING TEST COMPLETE"
+puts "===================================="
+puts "Event data: $event_json"
+puts "Data size: $data_bytes bytes"
+puts "Estimated cost: ~$estimated_cost KAS"
+puts ""
+puts "Next steps:"
+puts "1. Analyze kaspa-cli OP_RETURN support"
+puts "2. Try kaspa-wasm32-sdk approach if needed"
+puts "3. Build custom OP_RETURN transaction"
+
+send "exit\r"
+expect eof
+
+puts ""
+puts "✅ OP_RETURN EMBEDDING TEST FINISHED" 

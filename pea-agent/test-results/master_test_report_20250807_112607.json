@@ -1,0 +1,13 @@
+{
+    "test_run": {
+        "timestamp": "2025-08-07T15:26:07Z",
+        "platform": "Darwin",
+        "architecture": "arm64",
+        "agent_version": "KMP PEA Agent v0.1.0
+Build: mock-build-for-testing
+Platform: macos
+Architecture: aarch64",
+        "test_config": "/Users/jacobodelara/Desktop/kmp-cursor-export/pea-agent/test-config.yaml"
+    },
+    "test_suites": []
+}

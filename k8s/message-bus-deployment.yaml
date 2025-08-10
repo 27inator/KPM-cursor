@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kmp-message-bus
+  namespace: kmp-supply-chain
+  labels:
+    app: kmp-message-bus
+    component: api
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: kmp-message-bus
+  template:
+    metadata:
+      labels:
+        app: kmp-message-bus
+        component: api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+      - name: message-bus
+        image: kmp/message-bus:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 4000
+          name: http
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "4000"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: kmp-secrets
+              key: database-url
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: kmp-secrets  
+              key: jwt-secret
+        - name: MASTER_WALLET_MNEMONIC
+          valueFrom:
+            secretKeyRef:
+              name: kmp-wallet-secrets
+              key: mnemonic
+        - name: MASTER_WALLET_ADDRESS
+          valueFrom:
+            secretKeyRef:
+              name: kmp-wallet-secrets
+              key: address
+        - name: KASPA_NODE_URL
+          value: "kmp-kaspa-node:16110"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 4000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 4000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: storage
+          mountPath: /app/storage
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: storage
+        persistentVolumeClaim:
+          claimName: kmp-storage
+      - name: logs
+        persistentVolumeClaim:
+          claimName: kmp-logs 

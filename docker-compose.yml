@@ -1,0 +1,238 @@
+# ====================================
+# KMP SUPPLY CHAIN - FULL SYSTEM
+# Docker Compose orchestration
+# ====================================
+
+version: '3.8'
+
+services:
+  # ====================================
+  # DATABASE - PostgreSQL
+  # ====================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: kmp-postgres
+    environment:
+      POSTGRES_DB: kmp_supply_chain
+      POSTGRES_USER: kmp_user
+      POSTGRES_PASSWORD: kmp_secure_password_2024
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - kmp-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kmp_user -d kmp_supply_chain"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ====================================
+  # REDIS - Session & Cache Store
+  # ====================================
+  redis:
+    image: redis:7-alpine
+    container_name: kmp-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - kmp-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # ====================================
+  # MESSAGE BUS API - Core Application
+  # ====================================
+  message-bus:
+    build:
+      context: ./message_bus
+      dockerfile: Dockerfile
+      target: production
+    container_name: kmp-message-bus
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://kmp_user:kmp_secure_password_2024@postgres:5432/kmp_supply_chain
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: kmp_jwt_super_secure_secret_key_2024_production
+      RUST_SUBMITTER_PATH: /app/kaspa_broadcaster
+      KASPA_NODE_URL: kaspa-node:16110
+      # Wallet configuration
+      MASTER_WALLET_MNEMONIC: "mutual alley control inspire cloth alcohol venture invite decade floor crawl sail"
+      MASTER_WALLET_ADDRESS: "kaspatest:qpxm5tpyg8p6z7f6hy9mtlwz2es03cqtavaldsctcdltmnz6yfz6gvurgpmem"
+    ports:
+      - "4000:4000"
+    volumes:
+      - message_bus_storage:/app/storage
+      - message_bus_logs:/app/logs
+      - ./kaspa_broadcaster:/app/kaspa_broadcaster:ro
+    networks:
+      - kmp-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kaspa-broadcaster:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  # ====================================
+  # KASPA BROADCASTER - Rust Service
+  # ====================================
+  kaspa-broadcaster:
+    build:
+      context: ./kaspa_broadcaster
+      dockerfile: Dockerfile
+    container_name: kmp-kaspa-broadcaster
+    environment:
+      RUST_LOG: info
+      KASPA_NODE: kaspa-node:16110
+    volumes:
+      - kaspa_logs:/app/logs
+    networks:
+      - kmp-network
+    healthcheck:
+      test: ["CMD", "./kaspa_broadcaster", "--help"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # ====================================
+  # KASPA NODE - Local Testnet Node
+  # ====================================
+  kaspa-node:
+    image: kaspanet/kaspad:latest
+    container_name: kmp-kaspa-node
+    command: >
+      kaspad
+      --testnet
+      --connect=testnet-1.kaspad.net
+      --rpclisten=0.0.0.0:16110
+      --rpclisten-borsh=0.0.0.0:17110
+      --loglevel=info
+    ports:
+      - "16110:16110"  # RPC
+      - "17110:17110"  # RPC Borsh
+      - "16111:16111"  # P2P
+    volumes:
+      - kaspa_data:/app/data
+    networks:
+      - kmp-network
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 16110 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  # ====================================
+  # MONITORING - Prometheus
+  # ====================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: kmp-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - kmp-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+
+  # ====================================
+  # MONITORING - Grafana
+  # ====================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: kmp-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana:/etc/grafana/provisioning:ro
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: kmp_admin_2024
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    networks:
+      - kmp-network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  # ====================================
+  # DATABASE ADMIN - pgAdmin
+  # ====================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: kmp-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@kmp.local
+      PGADMIN_DEFAULT_PASSWORD: kmp_admin_2024
+      PGADMIN_CONFIG_WTF_CSRF_ENABLED: "False"
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - kmp-network
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+# ====================================
+# NETWORKS
+# ====================================
+networks:
+  kmp-network:
+    driver: bridge
+    name: kmp-supply-chain
+
+# ====================================
+# VOLUMES
+# ====================================
+volumes:
+  postgres_data:
+    name: kmp-postgres-data
+  redis_data:
+    name: kmp-redis-data
+  message_bus_storage:
+    name: kmp-message-bus-storage
+  message_bus_logs:
+    name: kmp-message-bus-logs
+  kaspa_logs:
+    name: kmp-kaspa-logs
+  kaspa_data:
+    name: kmp-kaspa-data
+  prometheus_data:
+    name: kmp-prometheus-data
+  grafana_data:
+    name: kmp-grafana-data
+  pgadmin_data:
+    name: kmp-pgadmin-data 

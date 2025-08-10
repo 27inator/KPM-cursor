@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" 
+           Name="KMP PEA Agent" 
+           Language="1033" 
+           Version="1.0.0" 
+           Manufacturer="KMP Technologies" 
+           UpgradeCode="12345678-1234-1234-1234-123456789012">
+    
+    <Package InstallerVersion="200" 
+             Compressed="yes" 
+             InstallScope="perMachine" 
+             Description="Kaspa Provenance Model Per-Device Edge Agent"
+             Comments="Secure supply chain scanner integration agent" />
+
+    <!-- Major upgrade handling -->
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    
+    <!-- Media and compression -->
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Installation directory structure -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="KMP PEA Agent">
+          <Directory Id="BinFolder" Name="bin" />
+          <Directory Id="ConfigFolder" Name="config" />
+          <Directory Id="LogsFolder" Name="logs" />
+        </Directory>
+      </Directory>
+      
+      <!-- Program Data directory for configuration -->
+      <Directory Id="CommonAppDataFolder">
+        <Directory Id="ProgramDataFolder" Name="KMP PEA Agent">
+          <Directory Id="DataConfigFolder" Name="config" />
+          <Directory Id="DataVaultFolder" Name="vault" />
+          <Directory Id="DataQueueFolder" Name="queue" />
+        </Directory>
+      </Directory>
+      
+      <!-- Start Menu -->
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="KMP PEA Agent" />
+      </Directory>
+      
+      <!-- Desktop -->
+      <Directory Id="DesktopFolder" />
+    </Directory>
+
+    <!-- Feature definition -->
+    <Feature Id="ProductFeature" Title="KMP PEA Agent" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentRef Id="ApplicationShortcut" />
+      <ComponentRef Id="DesktopShortcut" />
+      <ComponentRef Id="WindowsService" />
+      <ComponentRef Id="ConfigFiles" />
+    </Feature>
+
+    <!-- UI customization -->
+    <UI>
+      <UIRef Id="WixUI_InstallDir" />
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg" Order="2">1</Publish>
+      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="2">1</Publish>
+    </UI>
+    
+    <!-- License agreement -->
+    <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
+    
+    <!-- Custom actions for service installation -->
+    <CustomAction Id="InstallService" 
+                  ExeCommand='"[#PeaAgentExe]" install-service'
+                  Directory="INSTALLFOLDER"
+                  Execute="deferred"
+                  Impersonate="no" />
+                  
+    <CustomAction Id="StartService"
+                  ExeCommand='"[#PeaAgentExe]" start-service'
+                  Directory="INSTALLFOLDER" 
+                  Execute="deferred"
+                  Impersonate="no" />
+                  
+    <CustomAction Id="StopService"
+                  ExeCommand='"[#PeaAgentExe]" stop-service'
+                  Directory="INSTALLFOLDER"
+                  Execute="deferred"
+                  Impersonate="no" />
+                  
+    <CustomAction Id="UninstallService"
+                  ExeCommand='"[#PeaAgentExe]" uninstall-service'
+                  Directory="INSTALLFOLDER"
+                  Execute="deferred"
+                  Impersonate="no" />
+
+    <!-- Installation sequence -->
+    <InstallExecuteSequence>
+      <Custom Action="StopService" Before="InstallFiles">Installed</Custom>
+      <Custom Action="InstallService" After="InstallFiles">NOT Installed</Custom>
+      <Custom Action="StartService" After="InstallService">NOT Installed</Custom>
+      <Custom Action="UninstallService" After="StopService">Installed</Custom>
+    </InstallExecuteSequence>
+
+  </Product>
+
+  <!-- Component groups -->
+  <Fragment>
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      
+      <!-- Main executable -->
+      <Component Id="PeaAgentExecutable" Guid="*">
+        <File Id="PeaAgentExe" 
+              Source="$(var.SourceDir)\pea-agent.exe" 
+              KeyPath="yes" 
+              Checksum="yes" />
+      </Component>
+      
+      <!-- Daemon executable -->
+      <Component Id="PeaDaemonExecutable" Guid="*">
+        <File Id="PeaDaemonExe" 
+              Source="$(var.SourceDir)\pea-daemon.exe" 
+              KeyPath="yes" 
+              Checksum="yes" />
+      </Component>
+      
+      <!-- Runtime libraries -->
+      <Component Id="RuntimeLibraries" Guid="*">
+        <File Id="VcRedist" 
+              Source="$(var.SourceDir)\vcredist_x64.exe" 
+              KeyPath="yes" />
+      </Component>
+      
+      <!-- Documentation -->
+      <Component Id="Documentation" Guid="*">
+        <File Id="ReadmeFile" 
+              Source="$(var.SourceDir)\README.md" 
+              KeyPath="yes" />
+        <File Id="LicenseFile" 
+              Source="$(var.SourceDir)\LICENSE" />
+        <File Id="SecurityWhitepaper" 
+              Source="$(var.SourceDir)\SECURITY_WHITEPAPER.md" />
+      </Component>
+      
+    </ComponentGroup>
+  </Fragment>
+
+  <!-- Windows Service component -->
+  <Fragment>
+    <Component Id="WindowsService" Directory="INSTALLFOLDER" Guid="*">
+      <ServiceInstall Id="PeaAgentService"
+                      Name="KMPPeaAgent"
+                      DisplayName="KMP PEA Agent Service"
+                      Description="Kaspa Provenance Model Per-Device Edge Agent for supply chain scanning"
+                      Type="ownProcess"
+                      Start="auto"
+                      Account="LocalSystem"
+                      ErrorControl="normal"
+                      Arguments="start --service" />
+      
+      <ServiceControl Id="StartPeaAgentService"
+                      Name="KMPPeaAgent"
+                      Start="install"
+                      Stop="both"
+                      Remove="uninstall"
+                      Wait="yes" />
+    </Component>
+  </Fragment>
+
+  <!-- Configuration files -->
+  <Fragment>
+    <Component Id="ConfigFiles" Directory="DataConfigFolder" Guid="*">
+      <File Id="DefaultConfig" 
+            Source="$(var.SourceDir)\config\default.yaml" 
+            KeyPath="yes" 
+            Name="config.yaml" />
+      
+      <!-- Create empty directories -->
+      <CreateFolder />
+      
+      <!-- Set permissions for LocalSystem and Administrators -->
+      <util:PermissionEx User="SYSTEM" 
+                         GenericAll="yes" 
+                         xmlns:util="http://schemas.microsoft.com/wix/UtilExtension" />
+      <util:PermissionEx User="Administrators" 
+                         GenericAll="yes" 
+                         xmlns:util="http://schemas.microsoft.com/wix/UtilExtension" />
+    </Component>
+  </Fragment>
+
+  <!-- Start Menu shortcuts -->
+  <Fragment>
+    <Component Id="ApplicationShortcut" Directory="ApplicationProgramsFolder" Guid="*">
+      <Shortcut Id="ApplicationStartMenuShortcut"
+                Name="KMP PEA Agent"
+                Description="Kaspa Provenance Model Edge Agent"
+                Target="[#PeaAgentExe]"
+                Arguments="status"
+                WorkingDirectory="INSTALLFOLDER" />
+      
+      <Shortcut Id="ConfigurationShortcut"
+                Name="PEA Agent Configuration"
+                Description="Configure KMP PEA Agent settings"
+                Target="[#PeaAgentExe]"
+                Arguments="config"
+                WorkingDirectory="INSTALLFOLDER" />
+      
+      <Shortcut Id="UninstallShortcut"
+                Name="Uninstall KMP PEA Agent"
+                Description="Uninstall KMP PEA Agent"
+                Target="[SystemFolder]msiexec.exe"
+                Arguments="/x [ProductCode]" />
+      
+      <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall" />
+      <RegistryValue Root="HKCU" 
+                     Key="Software\KMP\PEA Agent" 
+                     Name="installed" 
+                     Type="integer" 
+                     Value="1" 
+                     KeyPath="yes" />
+    </Component>
+  </Fragment>
+
+  <!-- Desktop shortcut -->
+  <Fragment>
+    <Component Id="DesktopShortcut" Directory="DesktopFolder" Guid="*">
+      <Shortcut Id="DesktopShortcut"
+                Name="KMP PEA Agent"
+                Description="Kaspa Provenance Model Edge Agent"
+                Target="[#PeaAgentExe]"
+                Arguments="status"
+                WorkingDirectory="INSTALLFOLDER" />
+      
+      <RegistryValue Root="HKCU" 
+                     Key="Software\KMP\PEA Agent" 
+                     Name="desktop_shortcut" 
+                     Type="integer" 
+                     Value="1" 
+                     KeyPath="yes" />
+    </Component>
+  </Fragment>
+
+</Wix> 

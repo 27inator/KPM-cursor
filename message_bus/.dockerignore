@@ -1,0 +1,57 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Runtime
+dist/
+build/
+
+# Testing
+coverage/
+.nyc_output/
+
+# Storage
+storage/
+temp/
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Generated
+generated-sdks/
+postman-collection.json
+
+# Database
+*.sql
+migrations/
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore 

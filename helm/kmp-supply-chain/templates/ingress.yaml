@@ -1,0 +1,45 @@
+{{- if and .Values.messageBus.enabled .Values.messageBus.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "kmp-supply-chain.fullname" . }}-ingress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kmp-supply-chain.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ingress
+  {{- with .Values.messageBus.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.messageBus.ingress.className }}
+  ingressClassName: {{ .Values.messageBus.ingress.className }}
+  {{- end }}
+  {{- if .Values.messageBus.ingress.tls }}
+  tls:
+    {{- range .Values.messageBus.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.messageBus.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            {{- if .pathType }}
+            pathType: {{ .pathType }}
+            {{- end }}
+            backend:
+              service:
+                name: {{ include "kmp-supply-chain.fullname" $ }}-message-bus
+                port:
+                  number: {{ $.Values.messageBus.service.port }}
+          {{- end }}
+    {{- end }}
+{{- end }} 

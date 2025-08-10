@@ -1,0 +1,51 @@
+#!/usr/bin/expect -f
+
+set timeout 30
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+log_user 1
+
+puts "🔗 TESTING NODE CONNECTION"
+puts "========================="
+
+spawn $kaspa_cli
+expect "$ "
+
+puts "Setting server..."
+send "server 127.0.0.1:16220\r"
+expect "$ "
+
+puts "Connecting..."
+send "connect\r"
+
+expect {
+    "Connected to" {
+        puts "✅ SUCCESS: Connected to kaspad!"
+        set success 1
+    }
+    "Error" {
+        puts "❌ Connection failed"
+        set success 0
+    }
+    "WebSocket" {
+        puts "❌ WebSocket error - node not ready"
+        set success 0
+    }
+    timeout {
+        puts "❌ Connection timeout"
+        set success 0
+    }
+}
+
+expect "$ "
+send "exit\r"
+expect eof
+
+if {$success == 1} {
+    puts ""
+    puts "🎉 NODE IS READY FOR TRANSACTIONS!"
+} else {
+    puts ""
+    puts "❌ Node connection failed"
+    exit 1
+} 

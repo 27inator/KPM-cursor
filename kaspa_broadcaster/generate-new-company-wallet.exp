@@ -1,0 +1,79 @@
+#!/usr/bin/expect -f
+
+set timeout 30
+
+# Variables
+set kaspa_cli "../rusty-kaspa/target/debug/kaspa-cli"
+set wallet_encryption_password "27inatorA?"
+
+# Start kaspa-cli
+spawn $kaspa_cli
+
+# Wait for prompt
+expect "$ "
+
+# Connect to testnet
+send "server 127.0.0.1:17210\r"
+expect "$ "
+sleep 1
+send "connect\r"
+expect "Connected to"
+expect "$ "
+
+# Create new wallet
+send "wallet create company-wallet\r"
+
+# Handle wallet creation prompts
+expect {
+    "Enter default account title:" {
+        send "Company Account\r"
+        exp_continue
+    }
+    "Create phishing hint" {
+        send "n\r"
+        exp_continue
+    }
+    "Enter wallet encryption password:" {
+        send "$wallet_encryption_password\r"
+        exp_continue
+    }
+    "Re-enter wallet encryption password:" {
+        send "$wallet_encryption_password\r"
+        exp_continue
+    }
+    -re "Mnemonic phrase:\s*(.+)" {
+        set mnemonic $expect_out(1,string)
+        puts "🔑 MNEMONIC: $mnemonic"
+        exp_continue
+    }
+    "$ " {
+        # Creation complete
+    }
+}
+
+# Get the wallet address
+send "address\r"
+expect -re "Address: (kaspatest:\[a-z0-9\]+)"
+set company_address $expect_out(1,string)
+puts "🏢 COMPANY ADDRESS: $company_address"
+expect "$ "
+
+# Save details to file
+set output_file "new-company-wallet.txt"
+set fp [open $output_file w]
+puts $fp "NEW COMPANY WALLET DETAILS"
+puts $fp "=========================="
+puts $fp "Address: $company_address"
+puts $fp "Mnemonic: $mnemonic"
+puts $fp "Encryption Password: $wallet_encryption_password"
+puts $fp "Generated: [clock format [clock seconds]]"
+close $fp
+
+puts "✅ NEW WALLET GENERATED!"
+puts "📁 Details saved to: $output_file"
+puts "🏢 Address: $company_address"
+puts "🔑 Mnemonic: $mnemonic"
+
+# Exit
+send "exit\r"
+expect eof 

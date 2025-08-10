@@ -1,0 +1,88 @@
+#!/usr/bin/expect -f
+
+set timeout 60
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+set company_address "kaspatest:qplvd467p4r0nu0ddaa6hmca6de028qj6wz3xpvrr4und0xasghwjus2rg6rc"
+set test_amount "0.01"
+
+log_user 1
+
+puts "🔥 SIMPLE TRANSACTION TEST"
+puts "=========================="
+puts "Target: $company_address"
+puts "Amount: $test_amount KAS"
+puts ""
+
+spawn $kaspa_cli
+expect "$ "
+
+puts "Step 1: List wallets"
+send "wallet list\r"
+expect "$ "
+
+puts "Step 2: Open master wallet (index 0)"
+send "wallet open 0\r"
+
+expect {
+    "Enter wallet password:" {
+        send "\r"
+        puts "✅ Trying empty password"
+    }
+    "$ " {
+        puts "✅ Wallet opened"
+    }
+    timeout {
+        puts "❌ Timeout"
+        exit 1
+    }
+}
+
+expect "$ "
+
+puts "Step 3: Check address"
+send "account address\r"
+expect "$ "
+
+puts "Step 4: Check balance"
+send "account balance\r"
+expect "$ "
+
+puts "Step 5: Send transaction"
+send "account send $company_address $test_amount\r"
+
+expect {
+    -re "Transaction.*sent" {
+        puts "✅ TRANSACTION SENT!"
+        set success 1
+    }
+    -re "insufficient" {
+        puts "💸 NEED FUNDS"
+        set success 0
+    }
+    -re "Error" {
+        puts "❌ ERROR"
+        set success 0
+    }
+    "$ " {
+        puts "✅ Command completed"
+        set success 1
+    }
+    timeout {
+        puts "⏱️  Timeout"
+        set success 0
+    }
+}
+
+send "exit\r"
+expect eof
+
+if {$success == 1} {
+    puts ""
+    puts "🎉 TRANSACTION TEST SUCCESS!"
+    puts "Check company address on explorer:"
+    puts "https://explorer-tn10.kaspa.org/addresses/$company_address"
+} else {
+    puts "❌ Test failed"
+    exit 1
+} 

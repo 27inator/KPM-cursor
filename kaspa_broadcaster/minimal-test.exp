@@ -1,0 +1,44 @@
+#!/usr/bin/expect -f
+
+set timeout 30
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+log_user 1
+
+puts "🔧 MINIMAL KASPA-CLI TEST"
+puts "========================"
+puts "Step by step manual approach"
+
+spawn $kaspa_cli
+expect "$ "
+
+puts "\n1. List wallets:"
+send "wallet\r"
+expect "$ "
+
+send "list\r"
+expect "$ "
+
+puts "\n2. Try opening wallet by index:"
+send "open\r"
+expect "$ "
+
+send "0\r"
+expect "$ "
+
+puts "\n3. Check status:"
+send "\r"
+expect "$ "
+
+puts "\n4. Try list again:"
+send "list\r"
+expect "$ "
+
+puts "\n5. Try address:"
+send "address\r"
+expect "$ "
+
+send "exit\r"
+expect eof
+
+puts "\n🔧 Manual test complete" 

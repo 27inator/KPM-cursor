@@ -1,0 +1,84 @@
+#!/usr/bin/expect -f
+
+set timeout 60
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+log_user 1
+
+puts "🎯 EXACT PATTERN WALLET CREATOR"
+puts "==============================="
+puts "Based on observed pattern from previous runs"
+
+spawn $kaspa_cli
+expect "$ "
+
+send "wallet create --testnet-10\r"
+
+# Step 1: Account title
+expect "Default account title:"
+send "exact-pattern-test\r"
+puts "✅ Account title sent"
+
+# Step 2: Wait for the long phishing explanation to finish
+# and then the actual prompt
+expect "Create phishing hint (optional, press <enter> to skip):"
+send "\r"
+puts "✅ Phishing hint skipped"
+
+# Step 3: Look for mnemonic output patterns
+expect {
+    -re "Your mnemonic phrase: (.+)" {
+        set mnemonic [string trim $expect_out(1,string)]
+        puts "✅ Mnemonic captured: [string range $mnemonic 0 30]..."
+        set mnemonic_found 1
+    }
+    -re "Mnemonic phrase: (.+)" {
+        set mnemonic [string trim $expect_out(1,string)]
+        puts "✅ Mnemonic captured: [string range $mnemonic 0 30]..."
+        set mnemonic_found 1
+    }
+    -re "(.+)" {
+        puts "OTHER OUTPUT: $expect_out(1,string)"
+        if {[string match "*mnemonic*" $expect_out(1,string)]} {
+            puts "🔑 Contains mnemonic keyword!"
+        }
+        exp_continue
+    }
+    timeout {
+        puts "❌ Timeout waiting for mnemonic"
+        set mnemonic_found 0
+    }
+}
+
+if {[info exists mnemonic_found] && $mnemonic_found == 1} {
+    # Step 4: Wait for prompt and get address
+    expect "$ "
+    send "wallet address --testnet-10\r"
+    
+    expect {
+        -re "(kaspatest:\[a-z0-9\]+)" {
+            set address $expect_out(1,string)
+            puts "✅ Address: $address"
+            puts "🌐 Explorer: https://explorer-tn10.kaspa.org/addresses/$address"
+            
+            # Save success
+            set fp [open "exact_pattern_success.txt" w]
+            puts $fp "EXACT PATTERN SUCCESS!"
+            puts $fp "====================="
+            puts $fp "Company: exact-pattern-test"
+            puts $fp "Address: $address"
+            puts $fp "Mnemonic: $mnemonic"
+            puts $fp "Explorer: https://explorer-tn10.kaspa.org/addresses/$address"
+            close $fp
+            
+            puts "🎉 WALLET CREATION SUCCESSFUL!"
+            puts "💾 Saved to: exact_pattern_success.txt"
+        }
+        timeout {
+            puts "❌ No address found"
+        }
+    }
+}
+
+send "exit\r"
+expect eof 

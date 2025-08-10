@@ -1,0 +1,53 @@
+#!/usr/bin/expect -f
+
+set timeout 30
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+log_user 1
+
+puts "🏢 CREATING SAMPLE COMPANY WALLET"
+puts "================================="
+puts "Manual creation for testing"
+puts ""
+
+spawn $kaspa_cli
+expect "$ "
+
+puts "Creating wallet..."
+send "wallet create --testnet-10\r"
+
+puts "Entering account title..."
+expect "Default account title:"
+send "sample-company-1\r"
+
+puts "Skipping phishing hint..."
+expect "Create phishing hint (optional, press <enter> to skip):"
+send "\r"
+
+puts "Entering password..."
+expect "Enter wallet encryption password:"
+send "CompanyPass123!\r"
+
+puts "Confirming password..."
+expect "Re-enter wallet encryption password:"
+send "CompanyPass123!\r"
+
+puts "Waiting for wallet creation to complete..."
+expect "$ "
+
+puts "Getting wallet address..."
+send "wallet address --testnet-10\r"
+expect "$ "
+
+puts "Exiting..."
+send "exit\r"
+expect eof
+
+puts ""
+puts "✅ SAMPLE COMPANY WALLET CREATED!"
+puts "================================="
+puts "Check the output above for:"
+puts "- The mnemonic phrase (12 words)"
+puts "- The kaspatest: address"
+puts ""
+puts "Save this info and we'll test transactions!" 

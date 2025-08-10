@@ -1,0 +1,37 @@
+#!/usr/bin/expect -f
+
+set timeout 30
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+log_user 1
+
+puts "🔍 EXPLORING KASPA-CLI COMMANDS"
+puts "==============================="
+
+spawn $kaspa_cli
+expect "$ "
+
+puts "1. Checking help..."
+send "help\r"
+expect "$ "
+
+puts "2. Checking wallet help..."
+send "wallet\r"
+expect "$ "
+
+puts "3. Checking account help..."
+send "account\r"
+expect "$ "
+
+puts "4. Listing wallets..."
+send "wallet list\r"
+expect "$ "
+
+puts "5. Trying to open existing wallet..."
+send "wallet open\r"
+expect "$ "
+
+send "exit\r"
+expect eof
+
+puts "🔍 Command exploration complete" 

@@ -1,0 +1,123 @@
+#!/usr/bin/expect -f
+
+set timeout 30
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+log_user 1
+
+puts "🔒 SIMPLE WALLET CREATOR"
+puts "======================="
+puts "Creating isolated company wallets with test account titles"
+puts ""
+
+set companies {
+    "test-company-1"
+    "test-company-2" 
+    "test-company-3"
+    "test-company-4"
+}
+
+set wallet_results ""
+
+foreach company $companies {
+    puts "🏢 Creating wallet: $company"
+    
+    spawn $kaspa_cli
+    expect "$ "
+    
+    send "wallet create --testnet-10\r"
+    
+    # Wait for and handle account title prompt
+    expect {
+        "Default account title:" {
+            puts "   📝 Entering account title: $company"
+            send "$company\r"
+        }
+        timeout {
+            puts "   ❌ No account title prompt - skipping"
+            send "exit\r"
+            expect eof
+            continue
+        }
+    }
+    
+    # Capture the mnemonic phrase
+    set mnemonic ""
+    expect {
+        -re "Mnemonic phrase: (.+)" {
+            set mnemonic [string trim $expect_out(1,string)]
+            puts "   🔑 Mnemonic captured (${[string length $mnemonic]} chars)"
+        }
+        -re "Your recovery phrase: (.+)" {
+            set mnemonic [string trim $expect_out(1,string)]
+            puts "   🔑 Recovery phrase captured (${[string length $mnemonic]} chars)"
+        }
+        timeout {
+            puts "   ❌ Failed to capture mnemonic"
+            send "exit\r"
+            expect eof
+            continue
+        }
+    }
+    
+    # Handle phishing hint
+    expect {
+        "Create phishing hint" {
+            puts "   🛡️  Skipping phishing hint"
+            send "\r"
+        }
+        "$ " {
+            puts "   ✅ At prompt"
+        }
+        timeout {
+            puts "   ⚠️  Timeout after mnemonic"
+        }
+    }
+    
+    expect "$ "
+    
+    # Get wallet address
+    send "wallet address --testnet-10\r"
+    
+    set address ""
+    expect {
+        -re "(kaspatest:\[a-z0-9\]+)" {
+            set address $expect_out(1,string)
+            puts "   📍 Address: $address"
+        }
+        timeout {
+            puts "   ❌ Failed to get address"
+        }
+    }
+    
+    expect "$ "
+    send "exit\r"
+    expect eof
+    
+    if {$address != "" && $mnemonic != ""} {
+        append wallet_results "$company|$address|$mnemonic\n"
+        puts "   ✅ SUCCESS: $company wallet created"
+        puts "   🌐 https://explorer-tn10.kaspa.org/addresses/$address"
+    } else {
+        puts "   ❌ FAILED: $company wallet creation failed"
+    }
+    
+    puts ""
+    sleep 1
+}
+
+# Save results
+puts "💾 Saving wallet data..."
+set fp [open "simple_company_wallets.txt" w]
+puts $fp "SIMPLE COMPANY WALLETS"
+puts $fp "======================"
+puts $fp "Master: kaspatest:qpxm5tpyg8p6z7f6hy9mtlwz2es03cqtavaldsctcdltmnz6yfz6gvurgpmem"
+puts $fp "Master Mnemonic: arrest acid fall interest comfort expire aunt combine actor tackle stove coral"
+puts $fp ""
+puts $fp "Company Wallets (Format: CompanyID|Address|UniqueMnemonic):"
+puts $fp $wallet_results
+close $fp
+
+puts "💾 Results saved to: simple_company_wallets.txt"
+puts ""
+puts "🎯 READY TO TEST TRANSACTIONS!" 

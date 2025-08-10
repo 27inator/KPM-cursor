@@ -1,0 +1,96 @@
+#!/usr/bin/expect -f
+
+set timeout 30
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+# Mock supply chain event data (compact format)
+set event_data "{\"evt\":\"evt_001\",\"type\":\"SCAN\",\"prod\":\"PROD_ABC123\",\"batch\":\"BATCH_2024_001\",\"company\":\"acme-manufacturing\",\"ts\":1706383800,\"hash\":\"0x1a2b3c4d5e6f7890abcdef1234567890\"}"
+
+# Test addresses
+set master_address "kaspatest:qpxm5tpyg8p6z7f6hy9mtlwz2es03cqtavaldsctcdltmnz6yfz6gvurgpmem"
+set company_address "kaspatest:qqnv524mtnrn27qmftuvswz9meh6txtq00zyza0jlst8p4nq5kgkwpcnh4x78"
+
+log_user 1
+
+puts "🔗 TESTING DATA EMBEDDING IN KASPA TRANSACTIONS"
+puts "==============================================="
+puts "Event data: $event_data"
+puts "From: Company wallet"  
+puts "To: Master wallet"
+puts ""
+
+spawn $kaspa_cli
+expect "$ "
+
+puts "🔌 Connecting to node..."
+send "server 127.0.0.1:17210\r"
+expect "$ "
+
+send "connect\r"
+expect {
+    "Connected" {
+        puts "✅ Connected!"
+    }
+    "Error" {
+        puts "❌ Connection failed"
+        exit 1
+    }
+}
+expect "$ "
+
+puts "🔑 Opening company wallet..."
+send "wallet open company-test\r"
+expect "Enter wallet password:"
+send "password123\r"  # Adjust this to actual password
+expect "$ "
+
+puts "💰 Checking current balance..."
+send "list\r"
+expect "$ "
+
+puts ""
+puts "🧪 TESTING DATA EMBEDDING METHODS:"
+puts "=================================="
+
+# Method 1: Try sending with additional parameters
+puts "Method 1: Testing send command with extra parameters..."
+send "help send\r"
+expect "$ "
+
+# Method 2: Try transaction with memo/note
+puts "Method 2: Looking for memo/note options..."
+send "help transaction\r"
+expect "$ "
+
+# Method 3: Try raw transaction creation
+puts "Method 3: Looking for raw transaction options..."
+send "help\r"
+expect "$ "
+
+puts ""
+puts "📝 Available commands shown above."
+puts "Now let's try a basic transaction and see if we can add data..."
+
+# Try sending with different approaches
+puts "🚀 Attempting transaction with potential data embedding..."
+
+# Test if send command has additional parameters
+send "send --help\r"
+expect "$ "
+
+puts ""
+puts "🔍 If no data embedding found, we'll need to use:"
+puts "1. Custom transaction creation via kaspa-wasm32-sdk"
+puts "2. Multiple outputs with data encoding" 
+puts "3. External data storage with transaction hash references"
+
+send "exit\r"
+expect eof
+
+puts ""
+puts "📋 DATA EMBEDDING TEST COMPLETE"
+puts "==============================="
+puts "Next steps:"
+puts "1. Analyze available kaspa-cli options"
+puts "2. Implement data embedding method"
+puts "3. Test full supply chain event anchoring" 

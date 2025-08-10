@@ -1,0 +1,73 @@
+#!/usr/bin/expect -f
+
+set timeout 60
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+log_user 1
+
+puts "🏢 SIMPLE COMPANY WALLET CREATION"
+puts "================================="
+
+spawn $kaspa_cli
+expect "$ "
+
+send "wallet create --testnet-10\r"
+
+expect "Default account title:"
+send "simple-company\r"
+puts "✅ Account title: simple-company"
+
+expect "Create phishing hint (optional, press <enter> to skip):"
+send "\r"
+puts "✅ Phishing hint skipped"
+
+expect "Enter wallet encryption password:"
+send "password123\r"
+puts "✅ Password: password123"
+
+expect "Re-enter wallet encryption password:"
+send "password123\r"
+puts "✅ Password confirmed"
+
+puts "Waiting for results..."
+expect {
+    "wallet secrets do not match" {
+        puts "❌ STILL FAILING - password issue persists"
+        send "exit\r"
+        expect eof
+        exit 1
+    }
+    "$ " {
+        puts "✅ Wallet created! Getting address..."
+        send "wallet address --testnet-10\r"
+        
+        expect {
+            -re "(kaspatest:\[a-z0-9\]+)" {
+                set address $expect_out(1,string)
+                puts "✅ SUCCESS! Address: $address"
+                
+                # Save for testing
+                set fp [open "simple_company_wallet.txt" w]
+                puts $fp "SIMPLE COMPANY WALLET"
+                puts $fp "====================="
+                puts $fp "Name: simple-company"
+                puts $fp "Address: $address"
+                puts $fp "Password: password123"
+                puts $fp "Explorer: https://explorer-tn10.kaspa.org/addresses/$address"
+                close $fp
+                
+                puts "💾 Saved to: simple_company_wallet.txt"
+                puts "🌐 Explorer: https://explorer-tn10.kaspa.org/addresses/$address"
+            }
+            timeout {
+                puts "❌ No address found"
+            }
+        }
+    }
+    timeout {
+        puts "❌ Timeout"
+    }
+}
+
+send "exit\r"
+expect eof 

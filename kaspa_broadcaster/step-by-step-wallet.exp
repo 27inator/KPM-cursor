@@ -1,0 +1,151 @@
+#!/usr/bin/expect -f
+
+set timeout 60
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+log_user 1
+
+puts "📋 STEP-BY-STEP WALLET CREATOR"
+puts "============================="
+puts "Careful synchronization with each prompt"
+
+set company_name "step-by-step-test"
+set password "SecurePass123"
+
+puts "🏢 Company: $company_name"
+puts "🔐 Password: $password"
+puts ""
+
+spawn $kaspa_cli
+expect "$ "
+
+# Step 1
+puts "Step 1: Sending wallet create command"
+send "wallet create --testnet-10\r"
+
+# Step 2
+puts "Step 2: Waiting for account title"
+expect "Default account title:"
+send "$company_name\r"
+puts "✅ Account title: $company_name"
+
+# Step 3
+puts "Step 3: Waiting for phishing hint prompt"
+expect "Create phishing hint (optional, press <enter> to skip):"
+send "\r"
+puts "✅ Phishing hint skipped"
+
+# Step 4
+puts "Step 4: Waiting for first password prompt"
+expect "Enter wallet encryption password:"
+send "$password\r"
+puts "✅ First password entered"
+
+# Step 5
+puts "Step 5: Waiting for password confirmation"
+expect "Re-enter wallet encryption password:"
+send "$password\r"
+puts "✅ Password confirmed"
+
+# Step 6 - Look for success and mnemonic
+puts "Step 6: Looking for wallet creation success and mnemonic"
+puts "Waiting for output..."
+
+set success 0
+set mnemonic ""
+
+expect {
+    -re "Wallet created successfully" {
+        puts "✅ Wallet creation confirmed!"
+        set success 1
+        exp_continue
+    }
+    -re "Your mnemonic phrase is: (.+)" {
+        set mnemonic [string trim $expect_out(1,string)]
+        puts "✅ Mnemonic pattern 1: [string range $mnemonic 0 50]..."
+        exp_continue
+    }
+    -re "Your mnemonic phrase: (.+)" {
+        set mnemonic [string trim $expect_out(1,string)]
+        puts "✅ Mnemonic pattern 2: [string range $mnemonic 0 50]..."
+        exp_continue
+    }
+    -re "Mnemonic: (.+)" {
+        set mnemonic [string trim $expect_out(1,string)]
+        puts "✅ Mnemonic pattern 3: [string range $mnemonic 0 50]..."
+        exp_continue
+    }
+    -re "\n(\[a-z\]+ \[a-z\]+ \[a-z\]+ \[a-z\]+ \[a-z\]+ \[a-z\]+ \[a-z\]+ \[a-z\]+ \[a-z\]+ \[a-z\]+ \[a-z\]+ \[a-z\]+)\n" {
+        set potential_mnemonic [string trim $expect_out(1,string)]
+        # Verify it doesn't contain common non-mnemonic words
+        if {![string match "*phishing*" $potential_mnemonic] && ![string match "*secret*" $potential_mnemonic] && ![string match "*wallet*" $potential_mnemonic]} {
+            set mnemonic $potential_mnemonic
+            puts "✅ Mnemonic pattern 4: [string range $mnemonic 0 50]..."
+        }
+        exp_continue
+    }
+    "$ " {
+        puts "✅ Command prompt reached"
+        if {$success == 1 || $mnemonic != ""} {
+            puts "Proceeding to get address..."
+        }
+    }
+    -re "(.+)" {
+        puts "OUTPUT: $expect_out(1,string)"
+        exp_continue
+    }
+    timeout {
+        puts "⏱️  Timeout waiting for success"
+    }
+}
+
+# Step 7 - Get address if we have success
+if {$success == 1 || $mnemonic != ""} {
+    puts "Step 7: Getting wallet address"
+    send "wallet address --testnet-10\r"
+    
+    expect {
+        -re "(kaspatest:\[a-z0-9\]+)" {
+            set address $expect_out(1,string)
+            puts "✅ Address captured: $address"
+            
+            # Final result
+            puts ""
+            puts "🎉 WALLET CREATION COMPLETE!"
+            puts "================================"
+            puts "Company: $company_name"
+            puts "Address: $address"
+            if {$mnemonic != ""} {
+                puts "Mnemonic: $mnemonic"
+                puts "Words: [llength [split $mnemonic " "]]"
+            } else {
+                puts "Mnemonic: ⚠️  Not captured - check output above"
+            }
+            puts "Password: $password"
+            puts "Explorer: https://explorer-tn10.kaspa.org/addresses/$address"
+            
+            # Save result
+            set fp [open "step_by_step_result.txt" w]
+            puts $fp "STEP BY STEP RESULT"
+            puts $fp "=================="
+            puts $fp "Company: $company_name"
+            puts $fp "Address: $address"
+            puts $fp "Mnemonic: $mnemonic"
+            puts $fp "Password: $password"
+            close $fp
+            
+            puts "💾 Saved to: step_by_step_result.txt"
+        }
+        timeout {
+            puts "❌ No address found"
+        }
+    }
+} else {
+    puts "❌ Wallet creation failed - no success indicator"
+}
+
+send "exit\r"
+expect eof
+
+puts ""
+puts "📋 STEP-BY-STEP ANALYSIS COMPLETE" 

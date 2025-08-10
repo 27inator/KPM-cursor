@@ -1,0 +1,200 @@
+#!/usr/bin/expect -f
+
+set timeout 30
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+# Supply chain event data
+set supply_chain_event {{"event":"SCAN","product":"LW001","batch":"Q1_001","quality":"AAA","temp":"72F"}}
+
+# Wallet details
+set company_mnemonic "source tell gauge nature fatal mother glare pill raccoon kiwi acoustic parrot"
+set wallet_encryption_password "27inatorA?"
+set company_address "kaspatest:qqnv524mtnrn27qmftuvswz9meh6txtq00zyza0jlst8p4nq5kgkwpcnh4x78"
+set master_address "kaspatest:qpxm5tpyg8p6z7f6hy9mtlwz2es03cqtavaldsctcdltmnz6yfz6gvurgpmem"
+set send_amount "0.001"
+
+log_user 1
+
+puts "🚀 COMPANY → MASTER OP_RETURN TRANSACTION TEST"
+puts "=============================================="
+puts "Supply Chain Event: $supply_chain_event"
+puts "From: $company_address (Company)"
+puts "To: $master_address (Master)"
+puts "Amount: $send_amount KAS"
+puts ""
+
+spawn $kaspa_cli
+expect "$ "
+
+puts "🔌 Connecting to local node..."
+send "server 127.0.0.1:17210\r"
+expect "$ "
+
+send "connect\r"
+expect {
+    "Connected" {
+        puts "✅ Connected to Kaspa node!"
+    }
+    "Error" {
+        puts "❌ Connection failed"
+        exit 1
+    }
+}
+expect "$ "
+
+puts "🔑 Importing company wallet..."
+send "wallet import\r"
+expect {
+    "Are you sure you want to overwrite it" {
+        send "y\r"
+        expect "Enter mnemonic:"
+        send "$company_mnemonic\r"
+    }
+    "Enter mnemonic:" {
+        send "$company_mnemonic\r"
+    }
+}
+
+expect {
+    "Create phishing hint" {
+        send "\r"
+        expect {
+            "Enter wallet encryption password:" {
+                send "$wallet_encryption_password\r"
+                expect {
+                    "Re-enter wallet encryption password:" {
+                        send "$wallet_encryption_password\r"
+                        expect {
+                            "Enter bip39 mnemonic passphrase" {
+                                send "\r"
+                                expect "$ "
+                                puts "✅ Company wallet imported successfully!"
+                            }
+                            "$ " {
+                                puts "✅ Company wallet imported successfully!"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    "Enter wallet encryption password:" {
+        send "$wallet_encryption_password\r"
+        expect {
+            "Re-enter wallet encryption password:" {
+                send "$wallet_encryption_password\r"
+                expect {
+                    "Enter bip39 mnemonic passphrase" {
+                        send "\r"
+                        expect "$ "
+                        puts "✅ Company wallet imported successfully!"
+                    }
+                    "$ " {
+                        puts "✅ Company wallet imported successfully!"
+                    }
+                }
+            }
+        }
+    }
+}
+
+puts "🔓 Opening wallet..."
+send "wallet open\r"
+expect {
+    "Enter wallet password:" {
+        send "$wallet_encryption_password\r"
+        expect "$ "
+        puts "✅ Wallet opened successfully!"
+    }
+    "$ " {
+        puts "✅ Wallet already open!"
+    }
+}
+
+puts "💰 Checking company wallet balance..."
+send "list\r"
+expect "$ "
+
+puts "📍 Getting company wallet address..."
+send "address\r"
+expect "$ "
+
+puts ""
+puts "🚀 SUBMITTING COMPANY → MASTER TRANSACTION..."
+puts "============================================"
+puts "Sending $send_amount KAS from company to master..."
+puts "Supply chain data (conceptual): $supply_chain_event"
+
+send "send $send_amount $master_address\r"
+expect {
+    "Enter payment password:" {
+        send "$company_mnemonic\r"
+        expect {
+            "Transaction submitted" {
+                puts "✅ TRANSACTION SUBMITTED SUCCESSFULLY!"
+                expect -re "Transaction ID: (\[a-f0-9\]+)" {
+                    set tx_id $expect_out(1,string)
+                    puts "📋 Transaction ID: $tx_id"
+                    puts "🌐 Explorer: https://explorer-tn10.kaspa.org/txs/$tx_id"
+                    puts ""
+                    puts "🎉 SUCCESS: Company → Master transaction submitted!"
+                    puts "📦 Conceptual supply chain event: $supply_chain_event"
+                    puts "🔍 Transaction is now on Kaspa testnet blockchain!"
+                    puts ""
+                    puts "✅ VITAL PLUMBING TESTED: Company wallet can send to master wallet"
+                    puts "🔧 Next step: Add actual OP_RETURN data embedding"
+                }
+            }
+            "insufficient" {
+                puts "❌ Insufficient funds in company wallet"
+                exit 1
+            }
+            "Error" {
+                puts "❌ Transaction failed"
+                exit 1
+            }
+        }
+    }
+    "Transaction submitted" {
+        puts "✅ TRANSACTION SUBMITTED SUCCESSFULLY!"
+        expect -re "Transaction ID: (\[a-f0-9\]+)" {
+            set tx_id $expect_out(1,string)
+            puts "📋 Transaction ID: $tx_id"
+            puts "🌐 Explorer: https://explorer-tn10.kaspa.org/txs/$tx_id"
+            puts ""
+            puts "🎉 SUCCESS: Company → Master transaction submitted!"
+            puts "📦 Conceptual supply chain event: $supply_chain_event"
+            puts "🔍 Transaction is now on Kaspa testnet blockchain!"
+            puts ""
+            puts "✅ VITAL PLUMBING TESTED: Company wallet can send to master wallet"
+            puts "🔧 Next step: Add actual OP_RETURN data embedding"
+        }
+    }
+    "insufficient" {
+        puts "❌ Insufficient funds in company wallet"
+        exit 1
+    }
+    "Error" {
+        puts "❌ Transaction failed"
+        exit 1
+    }
+}
+
+expect "$ "
+
+puts ""
+puts "✅ COMPANY → MASTER TRANSACTION COMPLETE!"
+puts "========================================"
+puts "Company address: $company_address"
+puts "Master address: $master_address"
+puts "Amount sent: $send_amount KAS"
+puts ""
+puts "🔧 VITAL PLUMBING IS WORKING!"
+puts "Next: Add OP_RETURN data embedding to this flow"
+
+send "exit\r"
+expect eof
+
+puts ""
+puts "🚀 Ready for OP_RETURN integration!" 

@@ -1,0 +1,54 @@
+#!/usr/bin/expect -f
+
+set timeout 30
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+set master_mnemonic "arrest acid fall interest comfort expire aunt combine actor tackle stove coral"
+set company_address "kaspatest:q44c975c89be50e8c6ec6b850d1100f8b05a5603ed2812661587ad81abd"
+set event_hash "2663ab17173c8e2a69646c32c3b0b5187343363a9e40c07dd5725047dc071c2b1"
+
+puts "🚀 Starting kaspa-cli automation..."
+puts "Company: $company_address"
+puts "Event Hash: $event_hash"
+puts ""
+
+# Start kaspa-cli
+spawn $kaspa_cli
+expect "$ "
+
+puts "📝 Importing wallet..."
+send "wallet import --testnet-10\r"
+expect "Enter mnemonic:"
+send "$master_mnemonic\r"
+expect "$ "
+
+puts "💰 Checking balance..."
+send "wallet balance --testnet-10\r"
+expect "$ "
+
+puts "🚀 Sending transaction..."
+send "wallet send --testnet-10 --to $company_address --amount 0.01 --op-return $event_hash\r"
+expect {
+    "Transaction sent successfully" {
+        puts "✅ SUCCESS! Transaction sent!"
+        expect "Transaction ID:"
+        expect "$ "
+    }
+    "Error" {
+        puts "❌ Transaction failed"
+        expect "$ "
+    }
+    timeout {
+        puts "❌ Transaction timed out"
+    }
+}
+
+puts "Getting wallet address..."
+send "wallet address --testnet-10\r"
+expect "$ "
+
+puts "Exiting..."
+send "exit\r"
+expect eof
+
+puts ""
+puts "🎉 Master → Company wallet transaction completed!" 

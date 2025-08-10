@@ -1,0 +1,35 @@
+# KMP PEA Agent Test Configuration
+kaspa:
+  rpc_endpoints:
+    - "grpc://localhost:16210"
+  fee_rate: "1000"
+  max_fee: "10000000"
+  timeout_seconds: 30
+
+scanners:
+  auto_discovery: true
+  enabled_types:
+    - "mock"
+    - "usb_hid"
+  discovery_interval_seconds: 10
+
+vault:
+  vault_type: "file"
+  encryption_enabled: true
+
+logging:
+  level: "debug"
+  audit_enabled: true
+
+monitoring:
+  heartbeat_interval_hours: 24
+  anomaly_detection: true
+  enable_anomaly_alerts: false
+
+queue:
+  max_items: 1000
+  retention_days: 7
+
+security:
+  enable_sandboxing: false  # Disabled for testing
+  drop_privileges: false    # Disabled for testing 

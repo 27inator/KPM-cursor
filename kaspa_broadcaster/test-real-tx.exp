@@ -1,0 +1,127 @@
+#!/usr/bin/expect -f
+
+set timeout 120
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+set master_mnemonic "arrest acid fall interest comfort expire aunt combine actor tackle stove coral"
+
+# Use the REAL HD-generated addresses
+set master_address "kaspatest:qrzv8r278e8gsv9kp45ay8dckxdvwssadk2jaaafm929hedzm93h7jcg9k77w"
+set company_address "kaspatest:qzc74mqe8s04ctn8pvkgxdnn0u3t7nnrvzmelmca7557p6mlswusczgw4wtca"
+set company_name "fresh-test-company"
+
+log_user 1
+
+puts "🔥 TESTING REAL HD-GENERATED WALLETS"
+puts "===================================="
+puts "Master (index 0): $master_address"
+puts "Company (index 1): $company_address" 
+puts "Company: $company_name"
+puts ""
+
+# Start kaspa-cli
+spawn $kaspa_cli
+expect "$ "
+
+puts "📝 Importing master wallet..."
+send "wallet import --testnet-10\r"
+
+# Handle mnemonic and phishing hint
+expect {
+    "Enter mnemonic:" {
+        send "$master_mnemonic\r"
+    }
+    "Create phishing hint" {
+        send "\r"
+        expect "Enter mnemonic:"
+        send "$master_mnemonic\r"
+    }
+}
+
+expect {
+    "Create phishing hint" {
+        send "\r"
+    }
+    "$ " {
+        # Already at prompt
+    }
+}
+
+expect "$ "
+puts "✅ Wallet imported"
+
+puts "📍 Verifying master wallet address..."
+send "wallet address --testnet-10\r"
+expect "$ "
+
+puts "💰 Checking master wallet balance..."
+send "wallet balance --testnet-10\r"
+expect "$ "
+
+puts "🚀 Sending 0.001 KAS from REAL master to REAL company wallet..."
+send "wallet send --testnet-10 --to $company_address --amount 0.001\r"
+
+# Capture transaction result
+expect {
+    -re "Transaction.*(sent|submitted|completed|successful)" {
+        puts "✅ SUCCESS: Real transaction sent!"
+        set success 1
+    }
+    -re "Transaction.*(ID|Hash).*: (\[a-f0-9\]+)" {
+        puts "✅ SUCCESS: Real Transaction ID: $expect_out(2,string)"
+        set success 1
+        set tx_id $expect_out(2,string)
+    }
+    -re "(insufficient|not enough|balance)" {
+        puts "💸 ISSUE: Insufficient funds - master wallet needs funding"
+        set success 0
+        set need_funding 1
+    }
+    -re "(Error|Failed|Invalid)" {
+        puts "❌ FAILED: $expect_out(0,string)"
+        set success 0
+    }
+    "$ " {
+        puts "Command completed"
+        set success 1
+    }
+    timeout {
+        puts "❌ TIMEOUT"
+        set success 0
+    }
+}
+
+expect "$ "
+
+puts "Exiting..."
+send "exit\r"
+expect eof
+
+puts ""
+if {$success == 1} {
+    puts "🎉 REAL WALLET TRANSACTION TEST SUCCESSFUL!"
+    if {[info exists tx_id]} {
+        puts "✅ Real Transaction ID: $tx_id"
+        puts "🌐 Explorer: https://explorer-tn10.kaspa.org/txs/$tx_id"
+        
+        # Save successful transaction
+        set fp [open "real_tx_success.txt" w]
+        puts $fp "REAL TRANSACTION SUCCESS"
+        puts $fp "========================"
+        puts $fp "Master: $master_address"
+        puts $fp "Company: $company_address ($company_name)"
+        puts $fp "TX ID: $tx_id"
+        puts $fp "Explorer: https://explorer-tn10.kaspa.org/txs/$tx_id"
+        puts $fp "Company Explorer: https://explorer-tn10.kaspa.org/addresses/$company_address"
+        close $fp
+    }
+    puts "🌐 Master: https://explorer-tn10.kaspa.org/addresses/$master_address"
+    puts "🌐 Company: https://explorer-tn10.kaspa.org/addresses/$company_address"
+} else {
+    if {[info exists need_funding]} {
+        puts "💡 NEXT STEP: Fund the real master wallet with testnet KAS"
+        puts "🌐 Master wallet: https://explorer-tn10.kaspa.org/addresses/$master_address"
+        puts "💰 Get testnet KAS from: https://faucet-tn10.kaspa.org"
+    }
+    puts "❌ REAL WALLET TEST FAILED"
+    exit 1
+} 

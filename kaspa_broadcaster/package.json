@@ -1,0 +1,20 @@
+{
+  "name": "kaspa_broadcaster",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "broadcaster.mjs",
+  "scripts": {
+    "start": "node broadcaster.mjs",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@kaspa/grpc": "^1.4.0",
+    "@kaspa/wallet": "^1.4.27",
+    "kaspa-wasm32-sdk": "^0.15.2",
+    "node-cron": "^4.2.1"
+  }
+}

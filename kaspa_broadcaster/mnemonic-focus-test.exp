@@ -1,0 +1,137 @@
+#!/usr/bin/expect -f
+
+set timeout 60
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+log_user 1
+
+puts "🔍 MNEMONIC CAPTURE FOCUS TEST"
+puts "=============================="
+puts "Specifically testing mnemonic output parsing"
+
+spawn $kaspa_cli
+expect "$ "
+
+send "wallet create --testnet-10\r"
+
+# Handle all the prompts first
+expect "Default account title:"
+send "mnemonic-test\r"
+puts "✅ Account title"
+
+expect "Create phishing hint (optional, press <enter> to skip):"
+send "\r"
+puts "✅ Phishing hint skipped"
+
+expect "Enter wallet encryption password:"
+send "testpass\r"
+puts "✅ Password sent"
+
+# Look for password confirmation
+expect {
+    "Confirm wallet encryption password:" {
+        send "testpass\r"
+        puts "✅ Password confirmed"
+    }
+    timeout {
+        puts "⚠️  No confirmation prompt"
+    }
+}
+
+puts ""
+puts "🔑 NOW FOCUSING ON MNEMONIC OUTPUT..."
+puts "======================================"
+
+# Capture EVERYTHING for 30 seconds and look for mnemonic patterns
+set mnemonic_found 0
+set start_time [clock seconds]
+
+while {[expr [clock seconds] - $start_time] < 30 && $mnemonic_found == 0} {
+    expect {
+        -re "Your mnemonic phrase is: (.+)" {
+            set mnemonic [string trim $expect_out(1,string)]
+            puts "🎯 PATTERN 1 - 'Your mnemonic phrase is:' - FOUND!"
+            puts "   Mnemonic: $mnemonic"
+            set mnemonic_found 1
+        }
+        -re "Your mnemonic phrase: (.+)" {
+            set mnemonic [string trim $expect_out(1,string)]
+            puts "🎯 PATTERN 2 - 'Your mnemonic phrase:' - FOUND!"
+            puts "   Mnemonic: $mnemonic"
+            set mnemonic_found 1
+        }
+        -re "Mnemonic phrase: (.+)" {
+            set mnemonic [string trim $expect_out(1,string)]
+            puts "🎯 PATTERN 3 - 'Mnemonic phrase:' - FOUND!"
+            puts "   Mnemonic: $mnemonic"
+            set mnemonic_found 1
+        }
+        -re "mnemonic: (.+)" {
+            set mnemonic [string trim $expect_out(1,string)]
+            puts "🎯 PATTERN 4 - 'mnemonic:' - FOUND!"
+            puts "   Mnemonic: $mnemonic"
+            set mnemonic_found 1
+        }
+        -re "phrase: (.+)" {
+            set mnemonic [string trim $expect_out(1,string)]
+            puts "🎯 PATTERN 5 - 'phrase:' - FOUND!"
+            puts "   Mnemonic: $mnemonic"
+            set mnemonic_found 1
+        }
+        -re "\n(.+)\n" {
+            set line [string trim $expect_out(1,string)]
+            puts "LINE: '$line'"
+            
+            # Check if this line looks like a mnemonic (multiple words)
+            set word_count [llength [split $line " "]]
+            if {$word_count >= 12} {
+                puts "🎯 POSSIBLE MNEMONIC LINE ($word_count words): $line"
+                set mnemonic $line
+                set mnemonic_found 1
+            }
+            
+            # Continue looking
+            if {$mnemonic_found == 0} {
+                exp_continue
+            }
+        }
+        -re "(.+)" {
+            puts "OTHER: '$expect_out(1,string)'"
+            exp_continue
+        }
+        "$ " {
+            puts "🎯 COMMAND PROMPT REACHED"
+            break
+        }
+        timeout {
+            puts "⏱️  1 second timeout, continuing..."
+            exp_continue
+        }
+    }
+}
+
+if {$mnemonic_found == 1} {
+    puts ""
+    puts "🎉 MNEMONIC CAPTURE SUCCESS!"
+    puts "📝 Captured: [string range $mnemonic 0 50]..."
+    puts "📊 Length: [string length $mnemonic] characters"
+    puts "🔢 Words: [llength [split $mnemonic " "]]"
+    
+    # Save the result
+    set fp [open "mnemonic_capture_success.txt" w]
+    puts $fp "MNEMONIC CAPTURE SUCCESS"
+    puts $fp "======================"
+    puts $fp "Full mnemonic: $mnemonic"
+    puts $fp "Length: [string length $mnemonic]"
+    puts $fp "Word count: [llength [split $mnemonic " "]]"
+    close $fp
+    
+    puts "💾 Saved to: mnemonic_capture_success.txt"
+} else {
+    puts ""
+    puts "❌ MNEMONIC CAPTURE FAILED"
+    puts "🔧 Need to analyze the output patterns"
+}
+
+send "exit\r"
+expect eof 

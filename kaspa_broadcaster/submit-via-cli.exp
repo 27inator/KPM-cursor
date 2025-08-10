@@ -1,0 +1,183 @@
+#!/usr/bin/expect -f
+
+set timeout 30
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+# Supply chain event data
+set supply_chain_event {{"event":"SCAN","product":"LW001","batch":"Q1_001","quality":"AAA","temp":"72F"}}
+
+# Master wallet details
+set master_mnemonic "arrest acid fall interest comfort expire aunt combine actor tackle stove coral"
+set wallet_encryption_password "27inatorA?"
+set master_address "kaspatest:qpxm5tpyg8p6z7f6hy9mtlwz2es03cqtavaldsctcdltmnz6yfz6gvurgpmem"
+set send_amount "0.001"
+
+log_user 1
+
+puts "🚀 KASPA SUPPLY CHAIN TRANSACTION VIA CLI"
+puts "========================================"
+puts "Supply Chain Event: $supply_chain_event"
+puts "Send Amount: $send_amount KAS"
+puts "Master Address: $master_address"
+puts ""
+
+spawn $kaspa_cli
+expect "$ "
+
+puts "🔌 Connecting to local node..."
+send "server 127.0.0.1:17210\r"
+expect "$ "
+puts "✅ Server set to 127.0.0.1:17210"
+
+puts "🔗 Connecting to server..."
+send "connect\r"
+expect {
+    "Connected" {
+        puts "✅ Connected to Kaspa node!"
+    }
+    "Error" {
+        puts "❌ Connection failed"
+        exit 1
+    }
+}
+expect "$ "
+
+puts "🔑 Importing master wallet..."
+send "wallet import\r"
+expect {
+    "Are you sure you want to overwrite it" {
+        send "y\r"
+        expect "Enter mnemonic:"
+        send "$master_mnemonic\r"
+    }
+    "Enter mnemonic:" {
+        send "$master_mnemonic\r"
+    }
+}
+expect {
+    "Create phishing hint" {
+        send "\r"
+        expect {
+            "Enter wallet encryption password:" {
+                send "$wallet_encryption_password\r"
+                expect {
+                    "Re-enter wallet encryption password:" {
+                        send "$wallet_encryption_password\r"
+                        expect "$ "
+                        puts "✅ Wallet imported successfully!"
+                    }
+                    "$ " {
+                        puts "✅ Wallet imported successfully!"
+                    }
+                }
+            }
+            "$ " {
+                puts "✅ Wallet imported successfully!"
+            }
+        }
+    }
+    "Enter wallet encryption password:" {
+        send "$wallet_encryption_password\r"
+        expect {
+            "Re-enter wallet encryption password:" {
+                send "$wallet_encryption_password\r"
+                expect "$ "
+                puts "✅ Wallet imported successfully!"
+            }
+            "$ " {
+                puts "✅ Wallet imported successfully!"
+            }
+        }
+    }
+    "$ " {
+        puts "✅ Wallet imported successfully!"
+    }
+}
+
+puts "🔓 Opening wallet..."
+send "wallet open\r"
+expect {
+    "Enter wallet password:" {
+        send "$wallet_encryption_password\r"
+        expect "$ "
+        puts "✅ Wallet opened successfully!"
+    }
+    "$ " {
+        puts "✅ Wallet already open!"
+    }
+}
+
+puts "💰 Checking wallet balance..."
+send "list\r"
+expect "$ "
+
+puts "📍 Getting wallet address..."
+send "address\r"
+expect "$ "
+
+puts ""
+puts "🚀 SUBMITTING SUPPLY CHAIN TRANSACTION..."
+puts "========================================"
+puts "Sending $send_amount KAS to same address (with supply chain data in mind)..."
+
+send "send $send_amount $master_address\r"
+expect {
+    "Enter payment password:" {
+        send "$master_mnemonic\r"
+        expect {
+            "Transaction submitted" {
+                puts "✅ TRANSACTION SUBMITTED SUCCESSFULLY!"
+                expect -re "Transaction ID: (\[a-f0-9\]+)" {
+                    set tx_id $expect_out(1,string)
+                    puts "📋 Transaction ID: $tx_id"
+                    puts "🌐 Explorer: https://explorer-tn10.kaspa.org/txs/$tx_id"
+                    puts ""
+                    puts "🎉 SUCCESS: Supply chain anchoring transaction submitted!"
+                    puts "📦 Event data: $supply_chain_event"
+                    puts "🔍 Transaction is now on Kaspa testnet blockchain!"
+                }
+            }
+            "insufficient" {
+                puts "❌ Insufficient funds in wallet"
+                exit 1
+            }
+            "Error" {
+                puts "❌ Transaction failed"
+                exit 1
+            }
+        }
+    }
+    "Transaction submitted" {
+        puts "✅ TRANSACTION SUBMITTED SUCCESSFULLY!"
+        expect -re "Transaction ID: (\[a-f0-9\]+)" {
+            set tx_id $expect_out(1,string)
+            puts "📋 Transaction ID: $tx_id"
+            puts "🌐 Explorer: https://explorer-tn10.kaspa.org/txs/$tx_id"
+            puts ""
+            puts "🎉 SUCCESS: Supply chain anchoring transaction submitted!"
+            puts "📦 Event data: $supply_chain_event"
+            puts "🔍 Transaction is now on Kaspa testnet blockchain!"
+        }
+    }
+    "insufficient" {
+        puts "❌ Insufficient funds in wallet"
+        exit 1
+    }
+    "Error" {
+        puts "❌ Transaction failed"
+        exit 1
+    }
+}
+
+expect "$ "
+
+puts ""
+puts "✅ SUPPLY CHAIN TRANSACTION COMPLETE!"
+puts "====================================="
+puts "Next step: Add OP_RETURN data embedding to make this a true supply chain anchor"
+
+send "exit\r"
+expect eof
+
+puts ""
+puts "🚀 Ready for OP_RETURN integration!" 

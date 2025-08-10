@@ -1,0 +1,35 @@
+#!/usr/bin/expect -f
+
+set timeout 30
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+log_user 1
+
+puts "🔍 DEBUGGING WALLET CREATE OUTPUT"
+puts "================================="
+
+spawn $kaspa_cli
+expect "$ "
+
+puts "Running: wallet create --testnet-10"
+send "wallet create --testnet-10\r"
+
+# Log everything for 20 seconds to see what comes out
+for {set i 0} {$i < 20} {incr i} {
+    expect {
+        -re "(.+)" {
+            puts "DEBUG OUTPUT: $expect_out(1,string)"
+        }
+        timeout {
+            puts "DEBUG: timeout at iteration $i"
+            break
+        }
+        eof {
+            puts "DEBUG: eof reached"
+            break
+        }
+    }
+}
+
+send "exit\r"
+expect eof 

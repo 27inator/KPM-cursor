@@ -1,0 +1,516 @@
+name: Build and Release PEA Agent
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Security and code quality checks
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Run security audit
+        run: cargo audit
+
+      - name: Run cargo deny
+        uses: EmbarkStudios/cargo-deny-action@v1
+
+  # Code quality and linting
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Check documentation
+        run: cargo doc --no-deps --document-private-items
+
+  # Unit and integration tests
+  test:
+    name: Test Suite
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        rust: [stable]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install system dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libudev-dev libusb-1.0-0-dev pkg-config
+
+      - name: Install system dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install libusb pkg-config
+
+      - name: Run tests
+        run: cargo test --verbose --all-features
+
+      - name: Run integration tests
+        run: cargo test --test '*' --verbose
+
+  # Fuzz testing
+  fuzz-test:
+    name: Fuzz Testing
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz
+
+      - name: Run fuzz tests (short duration for CI)
+        run: |
+          cd fuzz
+          cargo fuzz run barcode_parser -- -max_total_time=60
+          cargo fuzz run vault_operations -- -max_total_time=60
+
+  # Cross-compilation build matrix
+  build:
+    name: Build (${{ matrix.target }})
+    needs: [security-audit, code-quality, test]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux targets
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            cross: false
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            cross: true
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            cross: true
+          
+          # Windows targets
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            cross: false
+          - target: x86_64-pc-windows-gnu
+            os: ubuntu-latest
+            cross: true
+          
+          # macOS targets
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            cross: false
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            cross: false
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install cross-compilation tools
+        if: matrix.cross
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Install system dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libudev-dev libusb-1.0-0-dev pkg-config
+
+      - name: Install system dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install libusb pkg-config
+
+      - name: Build binary
+        run: |
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            cross build --release --target ${{ matrix.target }}
+          else
+            cargo build --release --target ${{ matrix.target }}
+          fi
+
+      - name: Strip binary (Linux/macOS)
+        if: matrix.os != 'windows-latest'
+        run: |
+          if [ "${{ matrix.target }}" = "x86_64-unknown-linux-musl" ]; then
+            docker run --rm -v "$PWD":/app -w /app alpine:latest \
+              sh -c "apk add binutils && strip target/${{ matrix.target }}/release/pea-agent"
+          else
+            strip target/${{ matrix.target }}/release/pea-agent 2>/dev/null || true
+          fi
+
+      - name: Create binary archive
+        shell: bash
+        run: |
+          cd target/${{ matrix.target }}/release
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            7z a ../../../pea-agent-${{ matrix.target }}.zip pea-agent.exe pea-daemon.exe
+          else
+            tar czf ../../../pea-agent-${{ matrix.target }}.tar.gz pea-agent pea-daemon
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: pea-agent-${{ matrix.target }}
+          path: |
+            pea-agent-${{ matrix.target }}.*
+          retention-days: 30
+
+  # Package building
+  package:
+    name: Build Packages
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            package-type: deb
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-latest
+            package-type: rpm
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            package-type: pkg
+            target: x86_64-apple-darwin
+          - os: windows-latest
+            package-type: msi
+            target: x86_64-pc-windows-msvc
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: pea-agent-${{ matrix.target }}
+
+      - name: Extract binaries
+        shell: bash
+        run: |
+          mkdir -p binaries
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            7z x pea-agent-${{ matrix.target }}.zip -obinaries/
+          else
+            tar xzf pea-agent-${{ matrix.target }}.tar.gz -C binaries/
+          fi
+
+      - name: Install packaging tools (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          if [ "${{ matrix.package-type }}" = "deb" ]; then
+            sudo apt-get install -y dpkg-dev fakeroot lintian
+          elif [ "${{ matrix.package-type }}" = "rpm" ]; then
+            sudo apt-get install -y rpm
+            # Install rpmbuild
+            wget -O- https://github.com/rpm-software-management/rpm/releases/download/rpm-4.18.0-release/rpm-4.18.0.tar.bz2 | tar xj
+          fi
+
+      - name: Install packaging tools (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          # pkgbuild and productbuild are included with Xcode Command Line Tools
+          xcode-select --install 2>/dev/null || true
+
+      - name: Install WiX Toolset (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          # Install WiX via GitHub releases
+          Invoke-WebRequest -Uri "https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip" -OutFile "wix.zip"
+          Expand-Archive -Path "wix.zip" -DestinationPath "wix"
+          echo "$env:GITHUB_WORKSPACE\wix" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build DEB package
+        if: matrix.package-type == 'deb'
+        run: |
+          cp -r binaries/* target/release/
+          cd installers/linux
+          chmod +x build-deb.sh
+          ./build-deb.sh
+
+      - name: Build RPM package
+        if: matrix.package-type == 'rpm'
+        run: |
+          cp -r binaries/* target/release/
+          cd installers/linux
+          chmod +x build-rpm.sh
+          ./build-rpm.sh
+
+      - name: Build PKG package
+        if: matrix.package-type == 'pkg'
+        run: |
+          cp -r binaries/* target/release/
+          cd installers/macos
+          chmod +x build-pkg.sh
+          ./build-pkg.sh
+
+      - name: Build MSI package
+        if: matrix.package-type == 'msi'
+        shell: powershell
+        run: |
+          Copy-Item -Recurse binaries/* target/release/
+          cd installers/windows
+          candle.exe -ext WixUtilExtension -dSourceDir="..\..\target\release" pea-agent.wxs
+          light.exe -ext WixUtilExtension -out "KMP-PEA-Agent-${{ github.ref_name }}.msi" pea-agent.wixobj
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: packages-${{ matrix.package-type }}-${{ matrix.target }}
+          path: |
+            installers/**/*.deb
+            installers/**/*.rpm
+            installers/**/*.pkg
+            installers/**/*.msi
+            *.deb
+            *.rpm
+            *.pkg
+            *.msi
+          retention-days: 90
+
+  # Code signing
+  code-sign:
+    name: Code Signing
+    needs: package
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact-pattern: "*.msi"
+          - os: macos-latest
+            artifact-pattern: "*.pkg"
+    steps:
+      - name: Download package artifacts
+        uses: actions/download-artifact@v3
+        with:
+          pattern: packages-*-*
+          merge-multiple: true
+
+      - name: Code sign Windows MSI
+        if: matrix.os == 'windows-latest'
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+        shell: powershell
+        run: |
+          if ($env:WINDOWS_CERTIFICATE) {
+            $cert = [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
+            [IO.File]::WriteAllBytes("certificate.p12", $cert)
+            
+            Get-ChildItem -Path "." -Filter "*.msi" | ForEach-Object {
+              Write-Output "Signing $($_.Name)..."
+              & "C:\Program Files (x86)\Windows Kits\10\bin\x64\signtool.exe" sign `
+                /f certificate.p12 /p $env:CERTIFICATE_PASSWORD `
+                /t http://timestamp.digicert.com `
+                /fd SHA256 $_.FullName
+            }
+            
+            Remove-Item certificate.p12
+          } else {
+            Write-Output "No Windows certificate provided - skipping code signing"
+          }
+
+      - name: Code sign macOS PKG
+        if: matrix.os == 'macos-latest'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+        run: |
+          if [ -n "$MACOS_CERTIFICATE" ]; then
+            # Import certificate
+            echo "$MACOS_CERTIFICATE" | base64 --decode > certificate.p12
+            security create-keychain -p temp_password build.keychain
+            security default-keychain -s build.keychain
+            security unlock-keychain -p temp_password build.keychain
+            security import certificate.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/productsign
+            security set-key-partition-list -S apple-tool:,apple: -s -k temp_password build.keychain
+            
+            # Sign packages
+            for pkg in *.pkg; do
+              if [ -f "$pkg" ]; then
+                echo "Signing $pkg..."
+                productsign --sign "Developer ID Installer" "$pkg" "${pkg%.pkg}-signed.pkg"
+                mv "${pkg%.pkg}-signed.pkg" "$pkg"
+              fi
+            done
+            
+            # Cleanup
+            security delete-keychain build.keychain
+            rm certificate.p12
+          else
+            echo "No macOS certificate provided - skipping code signing"
+          fi
+
+      - name: Upload signed packages
+        uses: actions/upload-artifact@v3
+        with:
+          name: signed-packages-${{ matrix.os }}
+          path: |
+            *.msi
+            *.pkg
+          retention-days: 90
+
+  # Create GitHub release
+  release:
+    name: Create Release
+    needs: [build, package, code-sign]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Extract version from tag
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Generate changelog (simple version)
+          echo "## Changes in v$VERSION" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          git log --pretty=format:"- %s" $(git describe --tags --abbrev=0 HEAD^)..HEAD >> CHANGELOG.md || echo "- Initial release" >> CHANGELOG.md
+
+      - name: Create checksums
+        run: |
+          find . -name "pea-agent-*" -o -name "*.deb" -o -name "*.rpm" -o -name "*.pkg" -o -name "*.msi" | \
+          grep -v "/\." | while read file; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" >> checksums.txt
+            fi
+          done
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: KMP PEA Agent v${{ steps.changelog.outputs.version }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            pea-agent-*/pea-agent-*
+            packages-*/
+            signed-packages-*/
+            checksums.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Security scanning
+  security-scan:
+    name: Security Scan
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Linux binary
+        uses: actions/download-artifact@v3
+        with:
+          name: pea-agent-x86_64-unknown-linux-gnu
+
+      - name: Extract binary
+        run: tar xzf pea-agent-x86_64-unknown-linux-gnu.tar.gz
+
+      - name: Run binary security scan
+        run: |
+          # Install security scanning tools
+          sudo apt-get update
+          sudo apt-get install -y binutils file
+          
+          echo "=== Binary Analysis ==="
+          file pea-agent
+          
+          echo "=== Security Features ==="
+          readelf -d pea-agent | grep -E "(RELRO|BIND_NOW|PIE)" || echo "No hardening features detected"
+          
+          echo "=== Symbols ==="
+          nm -D pea-agent | head -20 || echo "No dynamic symbols"
+          
+          echo "=== Dependencies ==="
+          ldd pea-agent || echo "Static binary or no dependencies"
+
+      - name: Upload security scan results
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-scan-results
+          path: |
+            security-scan.txt
+          retention-days: 30 

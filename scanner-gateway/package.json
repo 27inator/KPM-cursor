@@ -1,0 +1,47 @@
+{
+  "name": "kmp-scanner-gateway",
+  "version": "1.0.0",
+  "description": "KMP Scanner Data Ingestion Gateway - Simple HTTP endpoint for supply chain scanners",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "nodemon src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "docker:build": "docker build -t kmp-scanner-gateway .",
+    "docker:run": "docker run -p 5000:5000 kmp-scanner-gateway"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5",
+    "compression": "^1.7.4",
+    "axios": "^1.6.2",
+    "uuid": "^9.0.1",
+    "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.4",
+    "@types/express": "^4.17.21",
+    "@types/uuid": "^9.0.7",
+    "@types/bcrypt": "^5.0.2",
+    "@types/jsonwebtoken": "^9.0.5",
+    "typescript": "^5.3.3",
+    "nodemon": "^3.0.2",
+    "ts-node": "^10.9.1"
+  },
+  "keywords": [
+    "kaspa",
+    "blockchain",
+    "supply-chain",
+    "scanner",
+    "barcode",
+    "rfid",
+    "webhook"
+  ],
+  "author": "KMP Team",
+  "license": "MIT"
+} 

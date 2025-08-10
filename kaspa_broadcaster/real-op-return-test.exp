@@ -1,0 +1,185 @@
+#!/usr/bin/expect -f
+
+set timeout 60
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+# Supply chain event data (consumer-readable)
+set supply_chain_event {{"event":"SCAN","product":"LW001","batch":"Q1_001","quality":"AAA","temp":"72F"}}
+
+# Wallet details
+set company_wallet "company-test"
+set company_password "password123"
+set company_address "kaspatest:qqnv524mtnrn27qmftuvswz9meh6txtq00zyza0jlst8p4nq5kgkwpcnh4x78"
+
+log_user 1
+
+puts "🔗 REAL OP_RETURN TRANSACTION TEST"
+puts "=================================="
+puts "Event: $supply_chain_event"
+puts "Size: [string length $supply_chain_event] bytes"
+puts "From: $company_address"
+puts ""
+
+spawn $kaspa_cli
+expect "$ "
+
+puts "🔌 Connecting to node..."
+send "server 127.0.0.1:17210\r"
+expect "$ "
+
+send "connect\r"
+expect {
+    "Connected" {
+        puts "✅ Connected to Kaspa node!"
+    }
+    "Error" {
+        puts "❌ Connection failed"
+        exit 1
+    }
+}
+expect "$ "
+
+puts "🔑 Opening company wallet..."
+send "wallet open $company_wallet\r"
+expect "Enter wallet password:"
+send "$company_password\r"
+expect {
+    "$ " {
+        puts "✅ Company wallet opened!"
+    }
+    timeout {
+        puts "❌ Failed to open wallet"
+        exit 1
+    }
+}
+
+puts "💰 Checking balance..."
+send "list\r"
+expect "$ "
+
+puts "📍 Getting address..."
+send "address\r"
+expect "$ "
+
+puts ""
+puts "🧪 TESTING OP_RETURN METHODS..."
+puts "==============================="
+
+# Method 1: Try send command with data parameter
+puts "Method 1: Testing send with --data parameter..."
+send "send 0.001 $company_address --data=\"$supply_chain_event\"\r"
+expect {
+    "Transaction submitted" {
+        puts "✅ SUCCESS: OP_RETURN transaction submitted via --data!"
+        expect -re "Transaction ID: (\[a-f0-9\]+)"
+        set transaction_id $expect_out(1,string)
+        puts "📋 Transaction ID: $transaction_id"
+        puts "🌐 Explorer: https://explorer-tn10.kaspa.org/txs/$transaction_id"
+    }
+    "Invalid" {
+        puts "⚠️  Method 1 failed: --data parameter not supported"
+    }
+    "Error" {
+        puts "⚠️  Method 1 failed: Error with --data parameter"
+    }
+    "$ " {
+        puts "⚠️  Method 1: Command completed, checking for transaction ID..."
+        # Look for transaction ID in output
+        expect -re "(\[a-f0-9\]{64})" {
+            set transaction_id $expect_out(1,string)
+            puts "✅ Transaction ID found: $transaction_id"
+            puts "🌐 Explorer: https://explorer-tn10.kaspa.org/txs/$transaction_id"
+        }
+    }
+}
+
+puts ""
+puts "Method 2: Testing help for OP_RETURN commands..."
+send "help | grep -i return\r"
+expect "$ "
+
+send "help | grep -i data\r"
+expect "$ "
+
+puts ""
+puts "Method 3: Testing raw transaction creation..."
+send "help transaction\r"
+expect "$ "
+
+send "help create\r"
+expect "$ "
+
+puts ""
+puts "🔍 EXPLORING AVAILABLE COMMANDS..."
+puts "================================="
+
+# Check all available commands for OP_RETURN support
+send "help\r"
+expect "$ "
+
+puts ""
+puts "🧪 TESTING SEND VARIATIONS..."
+puts "============================="
+
+# Try different send syntaxes
+puts "Testing: send with --memo..."
+send "send 0.001 $company_address --memo=\"$supply_chain_event\"\r"
+expect {
+    "Transaction submitted" {
+        puts "✅ SUCCESS with --memo!"
+    }
+    "Invalid" {
+        puts "⚠️  --memo not supported"
+    }
+    "$ " {
+        puts "⚠️  --memo command completed"
+    }
+}
+
+puts ""
+puts "Testing: send with --note..."
+send "send 0.001 $company_address --note=\"$supply_chain_event\"\r"
+expect {
+    "Transaction submitted" {
+        puts "✅ SUCCESS with --note!"
+    }
+    "Invalid" {
+        puts "⚠️  --note not supported"
+    }
+    "$ " {
+        puts "⚠️  --note command completed"
+    }
+}
+
+puts ""
+puts "Testing: send with --message..."
+send "send 0.001 $company_address --message=\"$supply_chain_event\"\r"
+expect {
+    "Transaction submitted" {
+        puts "✅ SUCCESS with --message!"
+    }
+    "Invalid" {
+        puts "⚠️  --message not supported"
+    }
+    "$ " {
+        puts "⚠️  --message command completed"
+    }
+}
+
+puts ""
+puts "📋 KASPA-CLI OP_RETURN ANALYSIS COMPLETE"
+puts "========================================"
+puts "Supply chain event: $supply_chain_event"
+puts "Event size: [string length $supply_chain_event] bytes"
+puts ""
+puts "Next steps based on results:"
+puts "1. If OP_RETURN supported: Use kaspa-cli directly"
+puts "2. If not supported: Use kaspa-wasm32-sdk for custom transaction"
+puts "3. Verify transaction in explorer"
+puts "4. Test reading data back via our decoder"
+
+send "exit\r"
+expect eof
+
+puts ""
+puts "✅ KASPA-CLI OP_RETURN TEST COMPLETE" 

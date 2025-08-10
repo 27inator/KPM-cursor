@@ -1,0 +1,34 @@
+#!/usr/bin/expect -f
+
+set timeout 30
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+log_user 1
+
+puts "🔒 ACCOUNT TITLE TEST"
+puts "===================="
+
+spawn $kaspa_cli
+expect "$ "
+
+send "wallet create --testnet-10\r"
+
+# Wait for the exact prompt text and respond immediately
+expect "Default account title:"
+puts "✅ Got the prompt! Sending account title..."
+send "test-company\r"
+
+# Now let's see what happens next
+puts "Waiting for next output..."
+expect {
+    -re "(.+)" {
+        puts "NEXT OUTPUT: $expect_out(1,string)"
+        exp_continue
+    }
+    timeout {
+        puts "No more output"
+    }
+}
+
+send "exit\r"
+expect eof 

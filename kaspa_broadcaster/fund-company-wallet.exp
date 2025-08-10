@@ -1,0 +1,106 @@
+#!/usr/bin/expect -f
+
+set timeout 60
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+# Master wallet details
+set master_mnemonic "arrest acid fall interest comfort expire aunt combine actor tackle stove coral"
+set master_address "kaspatest:qpxm5tpyg8p6z7f6hy9mtlwz2es03cqtavaldsctcdltmnz6yfz6gvurgpmem"
+
+# Company wallet address (generated from company mnemonic)
+set company_address "kaspatest:qqkwc6v0rg2p3rsqqje7clgvrtuadc6mtqjmef00x77m39wpptqac9ulcyd4s"
+set funding_amount "0.1"
+
+log_user 1
+
+puts "💰 FUNDING COMPANY WALLET FOR OP_RETURN TRANSACTIONS"
+puts "==================================================="
+puts "From: $master_address (Master)"
+puts "To: $company_address (Company)"
+puts "Amount: $funding_amount KAS"
+puts ""
+
+spawn $kaspa_cli
+expect "$ "
+
+puts "🔌 Connecting to node..."
+send "server 127.0.0.1:17210\r"
+expect "$ "
+
+send "connect\r"
+expect {
+    "Connected" {
+        puts "✅ Connected to Kaspa node!"
+    }
+    "Error" {
+        puts "❌ Connection failed"
+        exit 1
+    }
+}
+expect "$ "
+
+puts "🔑 Importing master wallet..."
+send "wallet import\r"
+expect "Enter mnemonic:"
+send "$master_mnemonic\r"
+expect {
+    "Create phishing hint" {
+        send "\r"
+    }
+    "$ " {
+        puts "✅ Wallet imported without phishing hint prompt"
+    }
+}
+expect "$ "
+
+puts "💰 Checking master wallet balance..."
+send "list\r"
+expect "$ "
+
+puts "📍 Checking master wallet address..."
+send "address\r"
+expect "$ "
+
+puts ""
+puts "💸 SENDING FUNDING TRANSACTION..."
+puts "==============================="
+puts "Sending $funding_amount KAS to company wallet..."
+
+send "send $funding_amount $company_address\r"
+expect {
+    "Transaction submitted" {
+        puts "✅ Funding transaction submitted!"
+    }
+    "insufficient" {
+        puts "❌ Insufficient funds in master wallet"
+        exit 1
+    }
+    "Error" {
+        puts "❌ Transaction failed"
+        exit 1
+    }
+    "$ " {
+        puts "✅ Transaction completed"
+    }
+}
+
+expect -re "Transaction ID: (\[a-f0-9\]+)" {
+    set tx_id $expect_out(1,string)
+    puts "📋 Transaction ID: $tx_id"
+    puts "🌐 Explorer: https://explorer-tn10.kaspa.org/txs/$tx_id"
+} 
+
+expect "$ "
+
+puts ""
+puts "✅ COMPANY WALLET FUNDED SUCCESSFULLY!"
+puts "====================================="
+puts "Company address: $company_address"
+puts "Funded amount: $funding_amount KAS"
+puts "Ready for OP_RETURN transactions!"
+
+send "exit\r"
+expect eof
+
+puts ""
+puts "🚀 Ready to submit supply chain OP_RETURN transactions!" 

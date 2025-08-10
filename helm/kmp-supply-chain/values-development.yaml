@@ -1,0 +1,110 @@
+# ====================================
+# KMP SUPPLY CHAIN - DEVELOPMENT VALUES
+# Optimized for development environment
+# ====================================
+
+# Override global settings for development
+global:
+  imageRegistry: ""
+  storageClass: "standard"
+
+# Development environment settings
+app:
+  environment: development
+
+# Message Bus - reduced resources for dev
+messageBus:
+  replicaCount: 1
+  
+  image:
+    tag: "dev"
+    pullPolicy: Always
+  
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+  
+  autoscaling:
+    enabled: false
+  
+  ingress:
+    enabled: true
+    hosts:
+      - host: api-dev.kmp-supply-chain.local
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+  
+  env:
+    NODE_ENV: development
+    LOG_LEVEL: debug
+
+# Kaspa Broadcaster - minimal resources
+kaspaBroadcaster:
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "100m"
+
+# PostgreSQL - smaller storage for dev
+postgresql:
+  auth:
+    postgresPassword: "dev_password"
+    password: "dev_password"
+  
+  primary:
+    persistence:
+      size: 5Gi
+    
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "200m"
+
+# Redis - minimal resources
+redis:
+  master:
+    persistence:
+      size: 1Gi
+    
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "50m"
+      limits:
+        memory: "128Mi"
+        cpu: "100m"
+
+# Monitoring - reduced storage
+monitoring:
+  prometheus:
+    persistence:
+      size: 2Gi
+  
+  grafana:
+    adminPassword: "dev_admin"
+    persistence:
+      size: 1Gi
+
+# Storage - smaller volumes
+storage:
+  persistence:
+    size: 5Gi
+
+# Security - development keys (NOT FOR PRODUCTION!)
+security:
+  secrets:
+    jwtSecret: "dev_jwt_secret_not_secure"
+    walletMnemonic: "mutual alley control inspire cloth alcohol venture invite decade floor crawl sail"
+    walletAddress: "kaspatest:qpxm5tpyg8p6z7f6hy9mtlwz2es03cqtavaldsctcdltmnz6yfz6gvurgpmem" 

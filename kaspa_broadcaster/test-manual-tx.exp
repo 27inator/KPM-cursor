@@ -1,0 +1,103 @@
+#!/usr/bin/expect -f
+
+set timeout 120
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+set master_mnemonic "arrest acid fall interest comfort expire aunt combine actor tackle stove coral"
+set company_address "kaspatest:q44c975c89be50e8c6ec6b850d1100f8b05a5603ed2812661587ad81abd"
+
+log_user 1
+
+puts "🧪 MANUAL TRANSACTION TEST"
+puts "========================="
+puts "Testing kaspa-cli transaction to company wallet..."
+puts "Company: $company_address"
+puts ""
+
+# Start kaspa-cli
+spawn $kaspa_cli
+expect "$ "
+
+puts "📝 Importing master wallet..."
+send "wallet import --testnet-10\r"
+
+# Handle mnemonic entry
+expect {
+    "Enter mnemonic:" {
+        send "$master_mnemonic\r"
+    }
+    "Create phishing hint" {
+        send "\r"
+        expect "Enter mnemonic:"
+        send "$master_mnemonic\r"
+    }
+}
+
+# Handle phishing hint prompt
+expect {
+    "Create phishing hint" {
+        puts "Skipping phishing hint..."
+        send "\r"
+    }
+    "$ " {
+        # Already at prompt
+    }
+}
+
+expect "$ "
+puts "✅ Wallet imported"
+
+puts "💰 Checking balance..."
+send "wallet balance --testnet-10\r"
+expect "$ "
+
+puts "📍 Getting wallet address..."  
+send "wallet address --testnet-10\r"
+expect "$ "
+
+puts "🚀 Sending 0.005 KAS to company wallet..."
+send "wallet send --testnet-10 --to $company_address --amount 0.005\r"
+
+# Capture transaction result
+expect {
+    -re "Transaction.*(sent|submitted|completed|successful)" {
+        puts "✅ SUCCESS: Transaction sent!"
+        set success 1
+    }
+    -re "Transaction.*(ID|Hash).*: (\[a-f0-9\]+)" {
+        puts "✅ SUCCESS: Transaction ID: $expect_out(2,string)"
+        set success 1
+        set tx_id $expect_out(2,string)
+    }
+    -re "(Error|Failed|Invalid|insufficient)" {
+        puts "❌ FAILED: $expect_out(0,string)"
+        set success 0
+    }
+    "$ " {
+        puts "Command completed - checking output"
+        set success 1
+    }
+    timeout {
+        puts "❌ TIMEOUT: Transaction took too long"
+        set success 0
+    }
+}
+
+expect "$ "
+
+puts "Exiting..."
+send "exit\r"
+expect eof
+
+if {$success == 1} {
+    puts ""
+    puts "🎉 MANUAL TEST SUCCESSFUL!"
+    if {[info exists tx_id]} {
+        puts "Transaction ID: $tx_id"
+        puts "🌐 Explorer: https://explorer-tn10.kaspa.org/txs/$tx_id"
+    }
+    puts "🌐 Company wallet: https://explorer-tn10.kaspa.org/addresses/$company_address"
+} else {
+    puts ""
+    puts "❌ MANUAL TEST FAILED"
+    exit 1
+} 

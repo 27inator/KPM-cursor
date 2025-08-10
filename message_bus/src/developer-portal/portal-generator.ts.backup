@@ -1,0 +1,601 @@
+import YAML from 'yamljs';
+import path from 'path';
+
+export interface CodeExample {
+  language: string;
+  label: string;
+  code: string;
+}
+
+export interface SDKInfo {
+  language: string;
+  packageName: string;
+  installCommand: string;
+  exampleUsage: string;
+}
+
+export class DeveloperPortalGenerator {
+  private openApiSpec: any;
+
+  constructor() {
+    this.openApiSpec = YAML.load(path.join(__dirname, '../../openapi.yaml'));
+  }
+
+  /**
+   * Generate Postman Collection v2.1 from OpenAPI spec
+   */
+  generatePostmanCollection(): any {
+    const postmanCollection = {
+      info: {
+        name: this.openApiSpec.info.title,
+        description: this.openApiSpec.info.description,
+        version: this.openApiSpec.info.version,
+        schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json'
+      },
+      auth: {
+        type: 'bearer',
+        bearer: [
+          {
+            key: 'token',
+            value: '{{jwt_token}}',
+            type: 'string'
+          }
+        ]
+      },
+      variable: [
+        {
+          key: 'baseUrl',
+          value: 'http://localhost:4000',
+          type: 'string'
+        },
+        {
+          key: 'jwt_token',
+          value: '',
+          type: 'string'
+        },
+        {
+          key: 'api_key',
+          value: '',
+          type: 'string'
+        }
+      ],
+      item: this.generatePostmanItems()
+    };
+
+    return postmanCollection;
+  }
+
+  private generatePostmanItems(): any[] {
+    const items: any[] = [];
+    const folders = new Map<string, any[]>();
+
+    // Group endpoints by tags
+    for (const [pathKey, pathItem] of Object.entries(this.openApiSpec.paths)) {
+      for (const [method, operation] of Object.entries(pathItem as any)) {
+        // Skip non-HTTP methods and ensure operation is valid
+        if (!operation || typeof operation !== 'object' || !('tags' in operation)) {
+          continue;
+        }
+
+        const op = operation as any;
+        if (!op.tags || !Array.isArray(op.tags) || op.tags.length === 0) {
+          continue;
+        }
+
+        const tag = op.tags[0];
+        const folderName = this.formatFolderName(tag);
+          
+          if (!folders.has(folderName)) {
+            folders.set(folderName, []);
+          }
+
+          const postmanItem = this.createPostmanItem(pathKey, method, operation);
+          folders.get(folderName)!.push(postmanItem);
+        }
+      }
+    }
+
+    // Convert folders to Postman format
+    for (const [folderName, folderItems] of folders.entries()) {
+      items.push({
+        name: folderName,
+        item: folderItems
+      });
+    }
+
+    return items;
+  }
+
+  private createPostmanItem(path: string, method: string, operation: any): any {
+    const item: any = {
+      name: operation.summary || `${method.toUpperCase()} ${path}`,
+      request: {
+        method: method.toUpperCase(),
+        header: this.generateHeaders(operation),
+        url: {
+          raw: `{{baseUrl}}${path}`,
+          host: ['{{baseUrl}}'],
+          path: path.split('/').filter(p => p)
+        }
+      }
+    };
+
+    // Add authentication
+    if (operation.security) {
+      item.request.auth = this.generateAuth(operation.security);
+    }
+
+    // Add request body if exists
+    if (operation.requestBody) {
+      item.request.body = this.generateRequestBody(operation.requestBody);
+    }
+
+    // Add path parameters
+    if (operation.parameters) {
+      const pathParams = operation.parameters.filter((p: any) => p.in === 'path');
+      if (pathParams.length > 0) {
+        item.request.url.variable = pathParams.map((param: any) => ({
+          key: param.name,
+          value: this.generateExampleValue(param.schema),
+          description: param.description
+        }));
+      }
+    }
+
+    return item;
+  }
+
+  private generateHeaders(operation: any): any[] {
+    const headers = [
+      {
+        key: 'Content-Type',
+        value: 'application/json',
+        type: 'text'
+      }
+    ];
+
+    // Add API key header if needed
+    if (operation.security?.some((s: any) => s.ApiKeyAuth)) {
+      headers.push({
+        key: 'X-API-Key',
+        value: '{{api_key}}',
+        type: 'text'
+      });
+    }
+
+    return headers;
+  }
+
+  private generateAuth(security: any[]): any {
+    for (const securityItem of security) {
+      if (securityItem.BearerAuth) {
+        return {
+          type: 'bearer',
+          bearer: [
+            {
+              key: 'token',
+              value: '{{jwt_token}}',
+              type: 'string'
+            }
+          ]
+        };
+      }
+      if (securityItem.ApiKeyAuth) {
+        return {
+          type: 'apikey',
+          apikey: [
+            {
+              key: 'key',
+              value: 'X-API-Key',
+              type: 'string'
+            },
+            {
+              key: 'value',
+              value: '{{api_key}}',
+              type: 'string'
+            }
+          ]
+        };
+      }
+    }
+    return null;
+  }
+
+  private generateRequestBody(requestBody: any): any {
+    if (requestBody.content?.['application/json']) {
+      const schema = requestBody.content['application/json'].schema;
+      return {
+        mode: 'raw',
+        raw: JSON.stringify(this.generateExampleFromSchema(schema), null, 2),
+        options: {
+          raw: {
+            language: 'json'
+          }
+        }
+      };
+    }
+    return {};
+  }
+
+  private generateExampleFromSchema(schema: any): any {
+    if (schema.$ref) {
+      const refPath = schema.$ref.replace('#/components/schemas/', '');
+      schema = this.openApiSpec.components.schemas[refPath];
+    }
+
+    if (schema.example) {
+      return schema.example;
+    }
+
+    if (schema.type === 'object' && schema.properties) {
+      const example: any = {};
+      for (const [propName, propSchema] of Object.entries(schema.properties)) {
+        example[propName] = this.generateExampleValue(propSchema as any);
+      }
+      return example;
+    }
+
+    return this.generateExampleValue(schema);
+  }
+
+  private generateExampleValue(schema: any): any {
+    if (schema.example !== undefined) return schema.example;
+    
+    switch (schema.type) {
+      case 'string':
+        if (schema.format === 'email') return 'user@example.com';
+        if (schema.format === 'date-time') return new Date().toISOString();
+        if (schema.enum) return schema.enum[0];
+        return 'string';
+      case 'integer':
+        return 1;
+      case 'number':
+        return 1.0;
+      case 'boolean':
+        return true;
+      case 'array':
+        return [this.generateExampleValue(schema.items)];
+      case 'object':
+        return {};
+      default:
+        return null;
+    }
+  }
+
+  private formatFolderName(tag: string): string {
+    return tag.replace(/([A-Z])/g, ' $1').trim();
+  }
+
+  /**
+   * Generate SDK information and examples
+   */
+  generateSDKInfo(): SDKInfo[] {
+    return [
+      {
+        language: 'TypeScript',
+        packageName: '@kmp/supply-chain-sdk',
+        installCommand: 'openapi-generator generate -i http://localhost:4000/openapi.json -g typescript-fetch -o ./kmp-typescript-sdk',
+        exampleUsage: `import { DefaultApi, Configuration } from '@kmp/supply-chain-sdk';
+
+const config = new Configuration({
+  basePath: 'http://localhost:4000',
+  apiKey: 'your-api-key-here',
+});
+
+const api = new DefaultApi(config);
+
+// Submit supply chain event
+const result = await api.apiSupplyChainEventPost({
+  supplyChainEvent: {
+    productId: 'ORGANIC_APPLE_001',
+    location: 'ORCHARD_WASHINGTON',
+    eventType: 'QUALITY_CHECK',
+    metadata: {
+      inspector: 'JOHN_DOE',
+      grade: 'PREMIUM'
+    }
+  }
+});
+
+console.log('Transaction:', result.transactionId);`
+      },
+      {
+        language: 'Python',
+        packageName: 'kmp-supply-chain',
+        installCommand: 'openapi-generator generate -i http://localhost:4000/openapi.json -g python -o ./kmp-python-sdk',
+        exampleUsage: `import kmp_supply_chain
+from kmp_supply_chain.api import default_api
+from kmp_supply_chain.model.supply_chain_event import SupplyChainEvent
+
+# Configure API client
+configuration = kmp_supply_chain.Configuration(
+    host="http://localhost:4000",
+    api_key={'X-API-Key': 'your-api-key-here'}
+)
+
+with kmp_supply_chain.ApiClient(configuration) as api_client:
+    api_instance = default_api.DefaultApi(api_client)
+    
+    # Submit supply chain event
+    event = SupplyChainEvent(
+        product_id="ORGANIC_APPLE_001",
+        location="ORCHARD_WASHINGTON",
+        event_type="QUALITY_CHECK",
+        metadata={
+            "inspector": "JOHN_DOE",
+            "grade": "PREMIUM"
+        }
+    )
+    
+    result = api_instance.api_supply_chain_event_post(event)
+    print(f"Transaction: {result.transaction_id}")`
+      },
+      {
+        language: 'Java',
+        packageName: 'com.kmp.supplychainapi',
+        installCommand: 'openapi-generator generate -i http://localhost:4000/openapi.json -g java -o ./kmp-java-sdk',
+        exampleUsage: `import com.kmp.supplychainapi.ApiClient;
+import com.kmp.supplychainapi.ApiException;
+import com.kmp.supplychainapi.Configuration;
+import com.kmp.supplychainapi.api.DefaultApi;
+import com.kmp.supplychainapi.model.SupplyChainEvent;
+import com.kmp.supplychainapi.model.SupplyChainEventResponse;
+
+public class KMPExample {
+    public static void main(String[] args) {
+        ApiClient defaultClient = Configuration.getDefaultApiClient();
+        defaultClient.setBasePath("http://localhost:4000");
+        defaultClient.setApiKey("your-api-key-here");
+        
+        DefaultApi apiInstance = new DefaultApi(defaultClient);
+        
+        try {
+            SupplyChainEvent event = new SupplyChainEvent()
+                .productId("ORGANIC_APPLE_001")
+                .location("ORCHARD_WASHINGTON")
+                .eventType("QUALITY_CHECK");
+                
+            SupplyChainEventResponse result = apiInstance.apiSupplyChainEventPost(event);
+            System.out.println("Transaction: " + result.getTransactionId());
+        } catch (ApiException e) {
+            System.err.println("Exception: " + e.getResponseBody());
+        }
+    }
+}`
+      }
+    ];
+  }
+
+  /**
+   * Generate comprehensive code examples for each endpoint
+   */
+  generateCodeExamples(path: string, method: string, operation: any): CodeExample[] {
+    const examples: CodeExample[] = [];
+
+    // cURL example
+    examples.push({
+      language: 'curl',
+      label: 'cURL',
+      code: this.generateCurlExample(path, method, operation)
+    });
+
+    // JavaScript/Fetch example
+    examples.push({
+      language: 'javascript',
+      label: 'JavaScript (Fetch)',
+      code: this.generateJavaScriptExample(path, method, operation)
+    });
+
+    // Python example
+    examples.push({
+      language: 'python',
+      label: 'Python (requests)',
+      code: this.generatePythonExample(path, method, operation)
+    });
+
+    return examples;
+  }
+
+  private generateCurlExample(path: string, method: string, operation: any): string {
+    let curl = `curl -X ${method.toUpperCase()} "http://localhost:4000${path}"`;
+    
+    // Add headers
+    curl += ' \\\n  -H "Content-Type: application/json"';
+    
+    if (operation.security?.some((s: any) => s.BearerAuth)) {
+      curl += ' \\\n  -H "Authorization: Bearer YOUR_JWT_TOKEN"';
+    }
+    
+    if (operation.security?.some((s: any) => s.ApiKeyAuth)) {
+      curl += ' \\\n  -H "X-API-Key: YOUR_API_KEY"';
+    }
+
+    // Add request body
+    if (operation.requestBody) {
+      const schema = operation.requestBody.content?.['application/json']?.schema;
+      if (schema) {
+        const example = JSON.stringify(this.generateExampleFromSchema(schema), null, 2);
+        curl += ` \\\n  -d '${example}'`;
+      }
+    }
+
+    return curl;
+  }
+
+  private generateJavaScriptExample(path: string, method: string, operation: any): string {
+    const hasBody = operation.requestBody;
+    const schema = hasBody ? operation.requestBody.content?.['application/json']?.schema : null;
+    const example = schema ? this.generateExampleFromSchema(schema) : null;
+
+    let js = `const response = await fetch('http://localhost:4000${path}', {
+  method: '${method.toUpperCase()}',
+  headers: {
+    'Content-Type': 'application/json',`;
+
+    if (operation.security?.some((s: any) => s.BearerAuth)) {
+      js += `\n    'Authorization': 'Bearer ' + yourJwtToken,`;
+    }
+    
+    if (operation.security?.some((s: any) => s.ApiKeyAuth)) {
+      js += `\n    'X-API-Key': yourApiKey,`;
+    }
+
+    js += '\n  }';
+
+    if (hasBody && example) {
+      js += `,\n  body: JSON.stringify(${JSON.stringify(example, null, 4).replace(/^/gm, '    ')})`;
+    }
+
+    js += `\n});
+
+const data = await response.json();
+console.log(data);`;
+
+    return js;
+  }
+
+  private generatePythonExample(path: string, method: string, operation: any): string {
+    const hasBody = operation.requestBody;
+    const schema = hasBody ? operation.requestBody.content?.['application/json']?.schema : null;
+    const example = schema ? this.generateExampleFromSchema(schema) : null;
+
+    let python = `import requests
+import json
+
+url = "http://localhost:4000${path}"
+headers = {"Content-Type": "application/json"`;
+
+    if (operation.security?.some((s: any) => s.BearerAuth)) {
+      python += `, "Authorization": "Bearer " + your_jwt_token`;
+    }
+    
+    if (operation.security?.some((s: any) => s.ApiKeyAuth)) {
+      python += `, "X-API-Key": your_api_key`;
+    }
+
+    python += '}\n';
+
+    if (hasBody && example) {
+      python += `\ndata = ${JSON.stringify(example, null, 2)}\n`;
+      python += `\nresponse = requests.${method}(url, headers=headers, json=data)`;
+    } else {
+      python += `\nresponse = requests.${method}(url, headers=headers)`;
+    }
+
+    python += `\nprint(response.json())`;
+
+    return python;
+  }
+
+  /**
+   * Generate a comprehensive getting started guide
+   */
+  generateGettingStartedGuide(): string {
+    return `# 🚀 Getting Started with KMP Supply Chain API
+
+## Quick Start
+
+### 1. Authentication
+Choose your authentication method:
+
+**Option A: JWT Tokens (Recommended for web apps)**
+\`\`\`bash
+# Register a new user
+curl -X POST "http://localhost:4000/api/auth/register" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "email": "your@email.com",
+    "password": "SecurePass123",
+    "firstName": "Your",
+    "lastName": "Name"
+  }'
+
+# Login to get JWT token
+curl -X POST "http://localhost:4000/api/auth/login" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "email": "your@email.com",
+    "password": "SecurePass123"
+  }'
+\`\`\`
+
+**Option B: API Keys (Recommended for server-to-server)**
+\`\`\`bash
+# First, get a JWT token, then create an API key
+curl -X POST "http://localhost:4000/api/auth/api-keys" \\
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "Production Integration",
+    "scopes": ["read:events", "write:events"]
+  }'
+\`\`\`
+
+### 2. Submit Your First Supply Chain Event
+
+\`\`\`bash
+curl -X POST "http://localhost:4000/api/supply-chain/event" \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: YOUR_API_KEY" \\
+  -d '{
+    "productId": "ORGANIC_APPLE_001",
+    "location": "ORCHARD_WASHINGTON",
+    "eventType": "QUALITY_CHECK",
+    "metadata": {
+      "inspector": "JOHN_DOE",
+      "grade": "PREMIUM",
+      "weight": "1.2kg"
+    }
+  }'
+\`\`\`
+
+### 3. Track Your Product
+
+\`\`\`bash
+# Get complete traceability for a product
+curl "http://localhost:4000/api/product/ORGANIC_APPLE_001/trace"
+\`\`\`
+
+## 📊 Payload Handling
+
+### Small Payloads (<20KB)
+Stored directly on the Kaspa blockchain for maximum security and decentralization.
+
+### Large Payloads (>20KB)
+Automatically stored off-chain with content hash anchored on-chain. Retrieve using:
+
+\`\`\`bash
+curl "http://localhost:4000/api/payload/CONTENT_HASH_HERE"
+\`\`\`
+
+## 🔗 Real-time Updates
+
+Connect to WebSocket for live transaction confirmations:
+
+\`\`\`javascript
+const socket = io('http://localhost:4000', {
+  auth: {
+    token: yourJwtToken
+  }
+});
+
+socket.on('transaction_confirmed', (data) => {
+  console.log('Transaction confirmed:', data);
+});
+\`\`\`
+
+## 📱 SDKs Available
+
+- **TypeScript/JavaScript**: \`npm install @kmp/supply-chain-sdk\`
+- **Python**: \`pip install kmp-supply-chain\`
+- **Java**: Available via Maven Central
+
+## 🆘 Need Help?
+
+- 📚 **Full Documentation**: [http://localhost:4000/docs](http://localhost:4000/docs)
+- 📮 **Postman Collection**: [Download](http://localhost:4000/developer/postman)
+- 🔧 **SDKs**: [Generator](http://localhost:4000/developer/sdks)
+- 💬 **Support**: support@kmp-api.example.com
+`;
+  }
+} 

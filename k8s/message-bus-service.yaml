@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kmp-message-bus
+  namespace: kmp-supply-chain
+  labels:
+    app: kmp-message-bus
+    component: api
+spec:
+  type: ClusterIP
+  ports:
+  - port: 4000
+    targetPort: 4000
+    protocol: TCP
+    name: http
+  selector:
+    app: kmp-message-bus
+
+---
+apiVersion: v1
+kind: Service  
+metadata:
+  name: kmp-message-bus-lb
+  namespace: kmp-supply-chain
+  labels:
+    app: kmp-message-bus
+    component: load-balancer
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 4000
+    protocol: TCP
+    name: http
+  - port: 443
+    targetPort: 4000
+    protocol: TCP
+    name: https
+  selector:
+    app: kmp-message-bus 

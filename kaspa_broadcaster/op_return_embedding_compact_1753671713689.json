@@ -1,0 +1,22 @@
+{
+  "inputs": [],
+  "outputs": [
+    {
+      "value": "0",
+      "scriptPublicKey": "6aa07b226576656e74223a225343414e222c2270726f64756374223a224c57303031222c226261746368223a2251315f303031222c227175616c697479223a22414141222c2274656d70223a22373246227d"
+    }
+  ],
+  "event": {
+    "event": "SCAN",
+    "product": "LW001",
+    "batch": "Q1_001",
+    "quality": "AAA",
+    "temp": "72F"
+  },
+  "from": "kaspatest:qqkwc6v0rg2p3rsqqje7clgvrtuadc6mtqjmef00x77m39wpptqac9ulcyd4s",
+  "to": "kaspatest:qrzv8r278e8gsv9kp45ay8dckxdvwssadk2jaaafm929hedzm93h7jcg9k77w",
+  "timestamp": "2025-07-28T03:01:53.685Z",
+  "estimated_cost": 0.0008,
+  "eventSize": 80,
+  "opReturnHex": "6aa07b226576656e74223a225343414e222c2270726f64756374223a224c57303031222c226261746368223a2251315f303031222c227175616c697479223a22414141222c2274656d70223a22373246227d"
+}

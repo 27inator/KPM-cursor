@@ -1,0 +1,156 @@
+#!/usr/bin/expect -f
+
+set timeout 120
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+set master_mnemonic "arrest acid fall interest comfort expire aunt combine actor tackle stove coral"
+
+# CONFIRMED working master wallet
+set master_address "kaspatest:qpxm5tpyg8p6z7f6hy9mtlwz2es03cqtavaldsctcdltmnz6yfz6gvurgpmem"
+
+# Test company address (we'll create this manually if needed)
+set company_address "kaspatest:qq0w7n59v8aq9z95ys4m3u0g8x7c7p9dmp4cxvtkmwmq5zn7e84a2v5qkwwf6"
+set test_amount "0.001"
+set supply_chain_event "TEST-EVENT-[clock seconds]"
+
+log_user 1
+
+puts "🔥 CORE TRANSACTION TEST"
+puts "========================"
+puts "FOCUS: Real master → company blockchain transactions"
+puts ""
+puts "📍 Master: $master_address (CONFIRMED)"
+puts "🏢 Company: $company_address" 
+puts "💰 Amount: $test_amount KAS"
+puts "📦 Event: $supply_chain_event"
+puts ""
+
+spawn $kaspa_cli
+expect "$ "
+
+puts "🔑 Importing confirmed master wallet..."
+send "wallet import --testnet-10\r"
+
+expect {
+    "Enter mnemonic:" {
+        send "$master_mnemonic\r"
+        puts "✅ Master mnemonic entered"
+    }
+    "Create phishing hint" {
+        send "\r"
+        expect "Enter mnemonic:"
+        send "$master_mnemonic\r"
+        puts "✅ Master mnemonic entered after hint"
+    }
+    timeout {
+        puts "❌ No mnemonic prompt"
+        exit 1
+    }
+}
+
+expect {
+    "Create phishing hint" {
+        send "\r"
+        puts "✅ Phishing hint skipped"
+    }
+    "$ " {
+        puts "✅ Master wallet imported"
+    }
+    timeout {
+        puts "❌ Import failed"
+        exit 1
+    }
+}
+
+expect "$ "
+
+puts "📍 Verifying master address..."
+send "wallet address --testnet-10\r"
+expect "$ "
+
+puts "💰 Checking master balance..."
+send "wallet balance --testnet-10\r"
+expect "$ "
+
+puts ""
+puts "🚀 SENDING CORE TRANSACTION"
+puts "============================"
+puts "This is the VITAL PLUMBING - real blockchain anchoring!"
+
+send "wallet send --testnet-10 --to $company_address --amount $test_amount\r"
+
+set tx_success 0
+set tx_id ""
+
+expect {
+    -re "Transaction.*(sent|submitted|completed)" {
+        puts "✅ TRANSACTION SENT!"
+        set tx_success 1
+    }
+    -re "Transaction.*(ID|Hash).*: (\[a-f0-9\]+)" {
+        set tx_id $expect_out(2,string)
+        puts "✅ TRANSACTION ID: $tx_id"
+        set tx_success 1
+    }
+    -re "(insufficient|not enough|balance)" {
+        puts "💸 INSUFFICIENT FUNDS"
+        puts "🎯 ACTION NEEDED: Fund master wallet"
+        puts "🌐 Address: $master_address"
+        puts "💰 Faucet: https://faucet-tn10.kaspa.org"
+        set tx_success 0
+    }
+    -re "(Error|Failed|Invalid)" {
+        puts "❌ TRANSACTION FAILED: $expect_out(0,string)"
+        set tx_success 0
+    }
+    timeout {
+        puts "⏱️  TRANSACTION TIMEOUT"
+        set tx_success 0
+    }
+}
+
+expect "$ "
+send "exit\r"
+expect eof
+
+puts ""
+if {$tx_success == 1} {
+    puts "🎉 CORE TRANSACTION SUCCESS!"
+    puts "============================="
+    
+    if {$tx_id != ""} {
+        puts "✅ Transaction ID: $tx_id"
+        puts "🌐 Explorer: https://explorer-tn10.kaspa.org/txs/$tx_id"
+    }
+    
+    puts "📍 Master Explorer: https://explorer-tn10.kaspa.org/addresses/$master_address"
+    puts "🏢 Company Explorer: https://explorer-tn10.kaspa.org/addresses/$company_address"
+    
+    # Save success
+    set fp [open "core_transaction_success.txt" w]
+    puts $fp "CORE TRANSACTION SUCCESS!"
+    puts $fp "========================"
+    puts $fp "Master: $master_address"
+    puts $fp "Company: $company_address"
+    puts $fp "Amount: $test_amount KAS"
+    puts $fp "Event: $supply_chain_event"
+    if {$tx_id != ""} {
+        puts $fp "TX ID: $tx_id"
+        puts $fp "Explorer: https://explorer-tn10.kaspa.org/txs/$tx_id"
+    }
+    puts $fp "Master Explorer: https://explorer-tn10.kaspa.org/addresses/$master_address"
+    puts $fp "Company Explorer: https://explorer-tn10.kaspa.org/addresses/$company_address"
+    close $fp
+    
+    puts ""
+    puts "🚀 VITAL PLUMBING WORKS!"
+    puts "✅ Real blockchain transactions: CONFIRMED"
+    puts "✅ Master → Company flow: WORKING"
+    puts "✅ Verifiable on explorer: YES"
+    puts ""
+    puts "💾 Results saved to: core_transaction_success.txt"
+    
+} else {
+    puts "❌ CORE TRANSACTION FAILED"
+    puts "🔧 Need to resolve transaction issues first"
+    exit 1
+} 

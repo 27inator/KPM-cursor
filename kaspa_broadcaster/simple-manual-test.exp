@@ -1,0 +1,41 @@
+#!/usr/bin/expect -f
+
+set timeout 5
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+log_user 1
+
+puts "🧪 SIMPLE MANUAL WALLET TEST"
+puts "============================"
+puts "Just showing raw output, no automation"
+
+spawn $kaspa_cli
+expect "$ "
+
+send "wallet create --testnet-10\r"
+
+# Just capture everything for 60 seconds
+expect {
+    "Default account title:" {
+        puts "\n🎯 ACCOUNT TITLE PROMPT FOUND!"
+        send "simple-test\r"
+        puts "✅ Sent: simple-test"
+        
+        # Continue capturing
+        expect {
+            -re "(.+)" {
+                puts "AFTER TITLE: $expect_out(1,string)"
+                exp_continue
+            }
+            timeout {
+                puts "Final timeout"
+            }
+        }
+    }
+    timeout {
+        puts "No account title prompt"
+    }
+}
+
+send "exit\r"
+expect eof 

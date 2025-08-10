@@ -1,0 +1,80 @@
+#!/usr/bin/expect -f
+
+set timeout 30
+
+# Wallet details
+set kaspa_cli "../rusty-kaspa/target/debug/kaspa-cli"
+set master_mnemonic "arrest acid fall interest comfort expire aunt combine actor tackle stove coral"
+set wallet_encryption_password "27inatorA?"
+set company_address "kaspatest:qp0q4mdtas30e4aeqq0j3dt8nd2nqwjsewgkcxty0h3zjflvpkz6wce3qgucz"
+set funding_amount "10.0"
+
+# Start kaspa-cli
+spawn $kaspa_cli
+
+# Connect to testnet
+expect "$ "
+send "server 127.0.0.1:17210\r"
+expect "$ "
+sleep 1
+send "connect\r"
+expect "Connected to"
+expect "$ "
+
+# Import master wallet
+send "wallet import master-wallet\r"
+
+# Handle import prompts
+expect {
+    "Enter default account title:" {
+        send "Master Account\r"
+        exp_continue
+    }
+    "Create phishing hint" {
+        send "n\r"
+        exp_continue
+    }
+    "Mnemonic:" {
+        send "$master_mnemonic\r"
+        exp_continue
+    }
+    "Enter wallet encryption password:" {
+        send "$wallet_encryption_password\r"
+        exp_continue
+    }
+    "Re-enter wallet encryption password:" {
+        send "$wallet_encryption_password\r"
+        exp_continue
+    }
+    "$ " {
+        # Import complete
+    }
+}
+
+# Open the wallet
+send "wallet open master-wallet\r"
+expect "Enter wallet encryption password:"
+send "$wallet_encryption_password\r"
+expect "Wallet opened:"
+expect "$ "
+
+# Check balance
+send "balance\r"
+expect "$ "
+
+# Fund the company wallet
+puts "💰 Funding company wallet with $funding_amount KAS..."
+send "send $company_address $funding_amount\r"
+
+# Handle payment password
+expect "Enter payment password:"
+send "$master_mnemonic\r"
+expect "$ "
+
+puts "✅ FUNDING COMPLETE!"
+puts "🏢 Company wallet funded: $company_address"
+puts "💰 Amount: $funding_amount KAS"
+
+# Exit
+send "exit\r"
+expect eof 

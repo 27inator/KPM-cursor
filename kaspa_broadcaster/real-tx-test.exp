@@ -1,0 +1,138 @@
+#!/usr/bin/expect -f
+
+set timeout 60
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+# CONFIRMED master wallet address
+set master_address "kaspatest:qpxm5tpyg8p6z7f6hy9mtlwz2es03cqtavaldsctcdltmnz6yfz6gvurgpmem"
+# Company wallet address (manually created)
+set company_address "kaspatest:qplvd467p4r0nu0ddaa6hmca6de028qj6wz3xpvrr4und0xasghwjus2rg6rc"
+set test_amount "0.01"
+
+log_user 1
+
+puts "🔥 REAL TRANSACTION TEST"
+puts "========================"
+puts "Master: $master_address"  
+puts "Company: $company_address"
+puts "Amount: $test_amount KAS"
+puts ""
+
+spawn $kaspa_cli
+expect "$ "
+
+puts "Step 1: List available wallets"
+send "wallet list\r"
+expect "$ "
+
+puts "Step 2: Try opening masterwallet"
+send "wallet open masterwallet\r"
+
+expect {
+    "Enter wallet password:" {
+        send "\r"
+        puts "Trying empty password"
+        expect {
+            "Unable to decrypt" {
+                puts "❌ Wrong password for masterwallet"
+                send "exit\r"
+                expect eof
+                exit 1
+            }
+            "$ " {
+                puts "✅ masterwallet opened"
+            }
+            timeout {
+                puts "❌ Timeout after password"
+                exit 1
+            }
+        }
+    }
+    "$ " {
+        puts "✅ masterwallet opened without password"
+    }
+    timeout {
+        puts "❌ Timeout opening masterwallet"
+        exit 1
+    }
+}
+
+puts "Step 3: List accounts in this wallet"
+send "list\r"
+expect "$ "
+
+puts "Step 4: Check current address"
+send "address\r"
+expect "$ "
+
+puts "Step 5: Try to send transaction"
+send "send $company_address $test_amount\r"
+
+expect {
+    -re "Transaction.*sent" {
+        puts "✅ TRANSACTION SUCCESSFUL!"
+        set success 1
+    }
+    -re "Transaction.*successful" {
+        puts "✅ TRANSACTION SUCCESSFUL!"
+        set success 1
+    }
+    -re "insufficient" {
+        puts "💸 INSUFFICIENT FUNDS"
+        puts "Need to fund master wallet"
+        set success 0
+    }
+    -re "please select an account" {
+        puts "⚠️  Need to select account first"
+        send "select 0\r"
+        expect "$ "
+        puts "Retrying send after selecting account..."
+        send "send $company_address $test_amount\r"
+        expect {
+            -re "Transaction.*sent" {
+                puts "✅ TRANSACTION SUCCESSFUL!"
+                set success 1
+            }
+            -re "insufficient" {
+                puts "💸 INSUFFICIENT FUNDS"
+                set success 0
+            }
+            timeout {
+                puts "⏱️  Retry timeout"
+                set success 0
+            }
+        }
+    }
+    -re "Error" {
+        puts "❌ ERROR: $expect_out(0,string)"
+        set success 0
+    }
+    timeout {
+        puts "⏱️  SEND TIMEOUT"
+        set success 0
+    }
+}
+
+send "exit\r"
+expect eof
+
+puts ""
+puts "========================================"
+if {$success == 1} {
+    puts "🎉 BLOCKCHAIN TRANSACTION SUCCESS!"
+    puts "=================================="
+    puts "✅ Real master → company transaction sent"
+    puts "✅ Verifiable on Kaspa testnet explorer"
+    puts ""
+    puts "📍 VERIFY ON EXPLORER:"
+    puts "Master:  https://explorer-tn10.kaspa.org/addresses/$master_address"
+    puts "Company: https://explorer-tn10.kaspa.org/addresses/$company_address"
+    puts ""
+    puts "🚀 CORE SUPPLY CHAIN ANCHORING PROVEN!"
+    
+} else {
+    puts "❌ TRANSACTION FAILED"
+    puts "Need to resolve wallet/funding issues"
+    exit 1
+}
+puts "========================================" 

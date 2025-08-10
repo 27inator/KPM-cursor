@@ -1,0 +1,58 @@
+[
+  {
+    "companyId": "acme-manufacturing",
+    "encryptedMnemonic": "7458946b800d610815b4d3e2dd217bd4:a9e3d39a45db9034208f9814ff06ed25b40ec484b1dcdc3b2505c333082ba9d88f7a4211d9925ce822264131774f6606857f308965c03516df3dd4b039bf476aa0b24270ba1d9158a5b972de275ba2c1e7ae41a67504c6bd6b37f0237a18ce4fdfb20700df05e54c828cb3c87103fb2d",
+    "address": "kaspatest:qd63d06c10d0b6444994f82bceea122a534598618bc02b58828b2f5febf",
+    "createdAt": "2025-07-25T19:40:53.539Z",
+    "isActive": true
+  },
+  {
+    "companyId": "global-logistics",
+    "encryptedMnemonic": "3198d03108bb211381898a11d0c9e7c0:45c767adc3d3b2561df5c783e6823bd53fb591436eba90487f55462533677d49c959091c244d713daad2409a6076e56717f730c419a30c7bf5640024d589e53570b8b50510694e4ee11d783a9ead3da290dae21d6ae6c5c915d6e15384db8a4e8a17d8bf2d5ae4446c6fdf0b6ee82700",
+    "address": "kaspatest:q44ee23930a581bcb9c949f613c444203bd2a0e43398e98b9f63884fdda",
+    "createdAt": "2025-07-25T19:40:53.544Z",
+    "isActive": true
+  },
+  {
+    "companyId": "premium-foods",
+    "encryptedMnemonic": "654ae123a8b86acc0fdaf2a5dba6b32a:0dc21ddf001a693b4eb9c83e241e4bf6c8d2270730b9229a220b6c8f78c776df76cc0d9f08289e2dcb2daad0ef626fdfc4a748c8b3e669c0a40059f7e7099e6c1023bb55b536efbf115a6da463c0d0ee46eedfbdbdf0e084b1989b0da67f43153b4db400465131006563ac7c30e964ee",
+    "address": "kaspatest:q0e6cd337370d382856354ba93eceed5e3accd833674677f2f403926a38",
+    "createdAt": "2025-07-25T19:40:53.547Z",
+    "isActive": true
+  },
+  {
+    "companyId": "test-blockchain",
+    "encryptedMnemonic": "a5c4ce6bcff8803e3f75d21943e22122:06f37f53f8bdeb5dd33a7117ef0381927a14001b1fd695516b6a2da74fc6f578a50fdce6a4fd011d201bf113f9c64d0708839e2643e1ee948813feb33b03fa15cd43d9e536c03875521fc567eb667cd3a908b03b02291c46b5e9363c851938c6f8273fec4200bdf3f9df9dc100afca40",
+    "address": "kaspatest:q128971c7ee9dd75db81277dedf017830ee454377d239238fbc6558b22f",
+    "createdAt": "2025-07-25T20:59:15.014Z",
+    "isActive": true
+  },
+  {
+    "companyId": "fresh-test-company",
+    "encryptedMnemonic": "7b911c5908495cec531f62251bd9bd31:e6f086c0b432d41e054cb188c558e207693adb525aa235445207bc4fb8fccc58400677082a42a46770ccea9df3a67917974453fae73d4e2224d9912c68e2b148453a495f52320cd38cef9a4b374694fd763e761255fe008218cab529fda7e5e4c57cdbde00e01e9bdbba6f6a85550ea8",
+    "address": "kaspatest:q44c975c89be50e8c6ec6b850d1100f8b05a5603ed2812661587ad81abd",
+    "createdAt": "2025-07-25T21:01:15.378Z",
+    "isActive": true
+  },
+  {
+    "companyId": "another-test-company",
+    "encryptedMnemonic": "1cc3f99b5c2cb98e90c16705900e2b90:7b62c5da431e03da955ebb0d339b43679b01af55f08a43656a2969818a34968b21a615bd54fb7c2d07140d99822957a7dcb1de26a2fa2b39bd8d6bd585d945268341ffbf3464eb07e289a1bb23bf03bb465e427142ba9f247e539728cfa07328",
+    "address": "kaspatest:q641f09e7810b46a8f99e21096da8ef79aa3cb736dab675036f9add86e5",
+    "createdAt": "2025-07-25T21:07:45.342Z",
+    "isActive": true
+  },
+  {
+    "companyId": "system-demo-company",
+    "encryptedMnemonic": "e0741689b49a911b75d7f9d86814c6ae:5e8a8601c47bcaa31b889c1c6ba69f0d8d5823247373500a0b92413df060f78f0320aba27a099e00296c4fce312d8d30fa4959a6e58b9a54ff7a8bbd4add19c385ebfa972a31632295561b573509f8d79ede4a152f5e6eee61b0aeafbb20529959d8e9dca34bd17cbfd895e5522a91bc",
+    "address": "kaspatest:q25e7c8bbb2d4b79cddcecc30df2259cde38798b8b647a7499f4c1785ab",
+    "createdAt": "2025-07-25T21:08:00.412Z",
+    "isActive": true
+  },
+  {
+    "companyId": "explorer-test-company",
+    "encryptedMnemonic": "2369ed7fa412092e2289a29146e2c58a:9ba50364097f8a0be42ecf216c3eb98661130c743a1a8159e1065bf38072b43deec65b1d9c3b5407b888519281bdce9f61e23462b46719aaf7c5e51b2a51041a8c02f935b3c1bd4456a036c78a0a6cb0d7e7dca3085cfbe7e733517f3507307d982c205aae4a52f989d78c63ecb26f96",
+    "address": "kaspatest:q35590480ad9ffd670ea472a11a187129d86ba9c4eac4b424c8e500232d",
+    "createdAt": "2025-07-25T21:38:43.647Z",
+    "isActive": true
+  }
+]

@@ -1,0 +1,16 @@
+[
+  {
+    "event_type": "SHIPMENT_START",
+    "product_id": "TEST123",
+    "timestamp": "2025-07-24T14:11:51.389864+00:00",
+    "location": "RANCH-001",
+    "operator_id": "OP_A"
+  },
+  {
+    "event_type": "SHIPMENT_START",
+    "product_id": "TEST123",
+    "timestamp": "2025-07-24T14:06:59.882440+00:00",
+    "location": "RANCH-001",
+    "operator_id": "OP_A"
+  }
+]

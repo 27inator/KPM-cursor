@@ -1,0 +1,160 @@
+#!/usr/bin/expect -f
+
+set timeout 30
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+set master_mnemonic "arrest acid fall interest comfort expire aunt combine actor tackle stove coral"
+set master_address "kaspatest:qpxm5tpyg8p6z7f6hy9mtlwz2es03cqtavaldsctcdltmnz6yfz6gvurgpmem"
+set company_address "kaspatest:qplvd467p4r0nu0ddaa6hmca6de028qj6wz3xpvrr4und0xasghwjus2rg6rc"
+
+log_user 1
+
+puts "🚀 MASTER → COMPANY TRANSACTION TEST"
+puts "==================================="
+puts "Master:  $master_address"
+puts "Company: $company_address"
+puts ""
+
+spawn $kaspa_cli
+expect "$ "
+
+puts "🔗 Setting server..."
+send "server 127.0.0.1:16220\r"
+expect "$ "
+
+puts "🔌 Connecting..."
+send "connect\r"
+expect {
+    "Connected" {
+        puts "✅ Connected to kaspad!"
+    }
+    "Error" {
+        puts "❌ Connection failed"
+        exit 1
+    }
+}
+expect "$ "
+
+puts "📋 Checking wallet status..."
+send "wallet list\r"
+expect "$ "
+
+puts "📍 Getting current address..."
+send "address\r"
+expect {
+    -re "(kaspatest:\[a-z0-9\]+)" {
+        set current_address $expect_out(1,string)
+        puts "Current address: $current_address"
+        if {$current_address == $master_address} {
+            puts "✅ Master wallet already loaded!"
+            set wallet_ready 1
+        } else {
+            puts "⚠️  Different wallet loaded"
+            set wallet_ready 0
+        }
+    }
+    "not connected" {
+        puts "❌ Not connected to wallet"
+        set wallet_ready 0
+    }
+}
+expect "$ "
+
+if {$wallet_ready == 0} {
+    puts "🔑 Importing master wallet..."
+    send "wallet import --testnet-10\r"
+    
+    expect {
+        "Are you sure you want" {
+            puts "   ⚠️  Overwriting existing wallet..."
+            send "y\r"
+        }
+        "Enter mnemonic:" {
+            # Wallet creation prompt
+        }
+    }
+    
+    expect "Enter mnemonic:"
+    send "$master_mnemonic\r"
+    
+    expect {
+        "Create phishing hint" {
+            send "\r"
+        }
+        "$ " {
+            # Import complete
+        }
+    }
+    
+    expect "$ "
+    puts "✅ Wallet imported"
+}
+
+puts "💰 Checking balance..."
+send "list\r"
+
+set balance 0
+expect {
+    -re "Balance: (\[0-9\.\]+)" {
+        set balance $expect_out(1,string)
+        puts "💰 Balance: $balance KAS"
+    }
+}
+expect "$ "
+
+if {$balance < 0.02} {
+    puts "❌ Insufficient balance ($balance < 0.02 KAS needed)"
+    puts "💡 Fund master wallet at: https://faucet-tn10.kaspa.org"
+    puts "📍 Address: $master_address"
+    send "exit\r"
+    expect eof
+    exit 1
+}
+
+puts "🚀 Sending 0.01 KAS to company wallet..."
+send "send $company_address 0.01\r"
+
+set tx_success 0
+set tx_id ""
+expect {
+    -re "Transaction.*(ID|Hash).*(\[a-f0-9\]{64})" {
+        set tx_id $expect_out(2,string)
+        puts "✅ Transaction ID: $tx_id"
+        set tx_success 1
+    }
+    -re "(sent|submitted|Transaction successful)" {
+        puts "✅ Transaction completed!"
+        set tx_success 1
+    }
+    -re "(insufficient|not enough)" {
+        puts "❌ Insufficient funds"
+    }
+    -re "(Error|Failed)" {
+        puts "❌ Transaction failed"
+    }
+    timeout {
+        puts "❌ Transaction timeout"
+    }
+}
+
+expect "$ "
+send "exit\r"
+expect eof
+
+puts ""
+if {$tx_success == 1} {
+    puts "🎉 SUCCESS! Master → Company transaction completed!"
+    puts ""
+    puts "🔗 VERIFICATION LINKS:"
+    puts "Master:  https://explorer-tn10.kaspa.org/addresses/$master_address"
+    puts "Company: https://explorer-tn10.kaspa.org/addresses/$company_address"
+    
+    if {$tx_id != ""} {
+        puts "Transaction: https://explorer-tn10.kaspa.org/txs/$tx_id"
+    }
+    
+    puts ""
+    puts "🚀 BLOCKCHAIN ANCHORING IS NOW READY!"
+} else {
+    puts "❌ Transaction failed"
+    exit 1
+} 

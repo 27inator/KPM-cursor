@@ -1,0 +1,143 @@
+name: pea-release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            pea-agent
+
+      - name: Build (release)
+        working-directory: pea-agent
+        run: cargo build --release
+
+      - name: Prepare artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_NAME=pea-agent
+          OUTDIR=pea-agent/target/release
+          VERSION=${GITHUB_REF_NAME#v}
+          case "${{ runner.os }}" in
+            Linux)
+              BIN="$OUTDIR/$APP_NAME"
+              PKG_NAME="kpm-${APP_NAME}_${VERSION}_linux_amd64"
+              mkdir -p dist && cp "$BIN" "dist/$APP_NAME"
+              (cd dist && tar -czf "${PKG_NAME}.tar.gz" "$APP_NAME")
+              (cd dist && shasum -a 256 "${PKG_NAME}.tar.gz" > "${PKG_NAME}.tar.gz.sha256")
+              ;;
+            macOS)
+              BIN="$OUTDIR/$APP_NAME"
+              PKG_NAME="kpm-${APP_NAME}_${VERSION}_macos_universal"
+              mkdir -p dist && cp "$BIN" "dist/$APP_NAME"
+              (cd dist && tar -czf "${PKG_NAME}.tar.gz" "$APP_NAME")
+              (cd dist && shasum -a 256 "${PKG_NAME}.tar.gz" > "${PKG_NAME}.tar.gz.sha256")
+              ;;
+            Windows)
+              BIN="pea-agent/target/release/pea-agent.exe"
+              PKG_NAME="kpm-${APP_NAME}_${VERSION}_windows_amd64"
+              mkdir -p dist && cp "$BIN" "dist/${APP_NAME}.exe"
+              (cd dist && powershell -Command "Compress-Archive -Path ${APP_NAME}.exe -DestinationPath ${PKG_NAME}.zip")
+              (cd dist && powershell -Command "Get-FileHash ${PKG_NAME}.zip -Algorithm SHA256 | ForEach-Object { $_.Hash } | Set-Content ${PKG_NAME}.zip.sha256")
+              ;;
+          esac
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}-artifact
+          path: dist/*
+
+  audit:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            pea-agent
+      - name: Install cargo-audit
+        run: cargo install cargo-audit || true
+      - name: Run cargo audit
+        working-directory: pea-agent
+        run: cargo audit || true  # non-fatal initially
+
+  release:
+    needs: [build, audit]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: collected
+
+      - name: Verify checksums (non-Windows)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          chmod +x scripts/ci-verify-sha256.sh
+          cd dist
+          ../../scripts/ci-verify-sha256.sh
+
+      - name: Import GPG key (optional)
+        if: runner.os != 'Windows' && secrets.GPG_PRIVATE_KEY && secrets.GPG_PASSPHRASE
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        shell: bash
+        run: |
+          echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import
+          echo 'pinentry-mode loopback' >> ~/.gnupg/gpg.conf
+          echo 'use-agent' >> ~/.gnupg/gpg.conf
+
+      - name: Sign artifacts (optional)
+        if: runner.os != 'Windows' && secrets.GPG_PRIVATE_KEY && secrets.GPG_PASSPHRASE
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        shell: bash
+        run: |
+          cd dist
+          for f in *.{tar.gz,zip}; do
+            [ -e "$f" ] || continue
+            gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --detach-sign "$f"
+          done
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: PEA Agent ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: |
+            collected/**
+            collected/**/*.asc
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 

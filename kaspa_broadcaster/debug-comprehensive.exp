@@ -1,0 +1,74 @@
+#!/usr/bin/expect -f
+
+set timeout 60
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+log_user 1
+
+puts "🔍 DEBUG COMPREHENSIVE WALLET CREATOR"
+puts "===================================="
+
+spawn $kaspa_cli
+expect "$ "
+
+puts "Step 1: Sending wallet create..."
+send "wallet create --testnet-10\r"
+
+puts "Step 2: Looking for account title..."
+expect "Default account title:"
+puts "✅ FOUND account title prompt!"
+send "test-company-debug\r"
+puts "✅ SENT account title"
+
+puts "Step 3: Capturing ALL output for 30 seconds..."
+set start_time [clock seconds]
+while {[expr [clock seconds] - $start_time] < 30} {
+    expect {
+        -re "(.+)" {
+            puts "DEBUG OUTPUT: $expect_out(1,string)"
+            
+            # Check if this contains phishing hint
+            if {[string match "*phishing hint*" $expect_out(1,string)]} {
+                puts "🛡️  FOUND PHISHING HINT REFERENCE!"
+            }
+            
+            # Check if this contains mnemonic
+            if {[string match "*mnemonic*" $expect_out(1,string)] || [string match "*phrase*" $expect_out(1,string)]} {
+                puts "🔑 FOUND MNEMONIC REFERENCE!"
+            }
+            
+            # Check for specific prompts
+            if {[string match "*Create phishing hint*" $expect_out(1,string)]} {
+                puts "🎯 FOUND PHISHING HINT PROMPT - RESPONDING!"
+                send "\r"
+            }
+            
+            exp_continue
+        }
+        timeout {
+            puts "DEBUG: 1 second timeout, continuing..."
+            exp_continue
+        }
+        "$ " {
+            puts "🎯 FOUND COMMAND PROMPT!"
+            break
+        }
+    }
+}
+
+puts "Step 4: Final check - getting address..."
+send "wallet address --testnet-10\r"
+expect {
+    -re "(kaspatest:\[a-z0-9\]+)" {
+        set address $expect_out(1,string)
+        puts "✅ FINAL SUCCESS - Address: $address"
+    }
+    timeout {
+        puts "❌ No address found"
+    }
+}
+
+send "exit\r"
+expect eof
+
+puts "🔍 DEBUG COMPLETE" 

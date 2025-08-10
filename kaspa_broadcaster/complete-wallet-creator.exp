@@ -1,0 +1,111 @@
+#!/usr/bin/expect -f
+
+set timeout 30
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+log_user 1
+
+puts "🔒 COMPLETE ISOLATED WALLET CREATOR"
+puts "=================================="
+puts "Creating company wallets with UNIQUE mnemonics"
+puts ""
+
+set companies {"fresh-test-company" "explorer-test-company" "acme-manufacturing" "luxury-jewelers"}
+set wallet_data ""
+
+foreach company $companies {
+    puts "🏢 Creating wallet: $company"
+    
+    spawn $kaspa_cli
+    expect "$ "
+    
+    send "wallet create --testnet-10\r"
+    
+    # Handle account title
+    expect "Default account title:"
+    puts "   📝 Entering account title: $company"
+    send "$company\r"
+    
+    # Handle phishing hint  
+    expect "Create phishing hint"
+    puts "   🛡️  Skipping phishing hint..."
+    send "\r"
+    
+    # Capture mnemonic
+    puts "   🔑 Looking for mnemonic..."
+    expect {
+        -re "Your mnemonic phrase: (.+)" {
+            set mnemonic [string trim $expect_out(1,string)]
+            puts "   ✅ Mnemonic captured: [string range $mnemonic 0 30]..."
+        }
+        -re "Mnemonic phrase: (.+)" {
+            set mnemonic [string trim $expect_out(1,string)]
+            puts "   ✅ Mnemonic captured: [string range $mnemonic 0 30]..."
+        }
+        -re "phrase: (.+)" {
+            set mnemonic [string trim $expect_out(1,string)]
+            puts "   ✅ Mnemonic captured: [string range $mnemonic 0 30]..."
+        }
+        timeout {
+            puts "   ❌ Failed to capture mnemonic"
+            send "exit\r"
+            expect eof
+            continue
+        }
+    }
+    
+    expect "$ "
+    
+    # Get wallet address
+    puts "   📍 Getting wallet address..."
+    send "wallet address --testnet-10\r"
+    
+    expect {
+        -re "(kaspatest:\[a-z0-9\]+)" {
+            set address $expect_out(1,string)
+            puts "   ✅ Address: $address"
+        }
+        timeout {
+            puts "   ❌ Failed to get address"
+            send "exit\r"
+            expect eof
+            continue
+        }
+    }
+    
+    expect "$ "
+    send "exit\r"
+    expect eof
+    
+    # Save wallet data
+    if {[info exists address] && [info exists mnemonic]} {
+        append wallet_data "$company|$address|$mnemonic\n"
+        puts "   🎉 SUCCESS: $company wallet created"
+        puts "   🌐 Explorer: https://explorer-tn10.kaspa.org/addresses/$address"
+    } else {
+        puts "   ❌ FAILED: Missing data for $company"
+    }
+    
+    puts ""
+    unset -nocomplain address mnemonic
+    sleep 1
+}
+
+# Save all results
+puts "💾 Saving isolated wallet data..."
+set fp [open "isolated_wallets_success.txt" w]
+puts $fp "ISOLATED COMPANY WALLETS - SUCCESS"
+puts $fp "=================================="
+puts $fp "Master: kaspatest:qpxm5tpyg8p6z7f6hy9mtlwz2es03cqtavaldsctcdltmnz6yfz6gvurgpmem"
+puts $fp "Master Mnemonic: arrest acid fall interest comfort expire aunt combine actor tackle stove coral"
+puts $fp ""
+puts $fp "Company Wallets (Each with UNIQUE mnemonic):"
+puts $fp "Format: CompanyID|Address|UniqueMnemonic"
+puts $fp "============================================"
+puts $fp $wallet_data
+close $fp
+
+puts "✅ ISOLATION COMPLETE!"
+puts "💾 Results: isolated_wallets_success.txt"
+puts ""
+puts "🚀 READY FOR MASTER → COMPANY TRANSACTIONS!" 

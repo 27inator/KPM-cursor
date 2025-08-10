@@ -1,0 +1,291 @@
+# ====================================
+# KMP SUPPLY CHAIN - JAEGER TRACING
+# Distributed tracing for microservices
+# ====================================
+
+# Jaeger Agent DaemonSet
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: jaeger-agent
+  namespace: kmp-observability
+  labels:
+    app: jaeger-agent
+    app.kubernetes.io/name: jaeger
+    app.kubernetes.io/component: agent
+spec:
+  selector:
+    matchLabels:
+      app: jaeger-agent
+  template:
+    metadata:
+      labels:
+        app: jaeger-agent
+        app.kubernetes.io/name: jaeger
+        app.kubernetes.io/component: agent
+    spec:
+      containers:
+      - name: jaeger-agent
+        image: jaegertracing/jaeger-agent:1.51.0
+        imagePullPolicy: IfNotPresent
+        args:
+        - --reporter.grpc.host-port=jaeger-collector.kmp-observability.svc.cluster.local:14250
+        - --log-level=info
+        ports:
+        - name: zipkin-compact
+          containerPort: 5775
+          protocol: UDP
+        - name: jaeger-compact
+          containerPort: 6831
+          protocol: UDP
+        - name: jaeger-binary
+          containerPort: 6832
+          protocol: UDP
+        - name: http
+          containerPort: 5778
+          protocol: TCP
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 5778
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 5778
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+
+---
+# Jaeger Collector Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-collector
+  namespace: kmp-observability
+  labels:
+    app: jaeger-collector
+    app.kubernetes.io/name: jaeger
+    app.kubernetes.io/component: collector
+spec:
+  type: ClusterIP
+  ports:
+  - name: grpc
+    port: 14250
+    targetPort: 14250
+    protocol: TCP
+  - name: http
+    port: 14268
+    targetPort: 14268
+    protocol: TCP
+  - name: zipkin
+    port: 9411
+    targetPort: 9411
+    protocol: TCP
+  selector:
+    app: jaeger-collector
+
+---
+# Jaeger Collector Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger-collector
+  namespace: kmp-observability
+  labels:
+    app: jaeger-collector
+    app.kubernetes.io/name: jaeger
+    app.kubernetes.io/component: collector
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: jaeger-collector
+  template:
+    metadata:
+      labels:
+        app: jaeger-collector
+        app.kubernetes.io/name: jaeger
+        app.kubernetes.io/component: collector
+    spec:
+      containers:
+      - name: jaeger-collector
+        image: jaegertracing/jaeger-collector:1.51.0
+        imagePullPolicy: IfNotPresent
+        args:
+        - --es.server-urls=http://elasticsearch.kmp-observability.svc.cluster.local:9200
+        - --es.num-shards=1
+        - --es.num-replicas=0
+        - --log-level=info
+        - --span-storage.type=elasticsearch
+        ports:
+        - name: grpc
+          containerPort: 14250
+          protocol: TCP
+        - name: http
+          containerPort: 14268
+          protocol: TCP
+        - name: zipkin
+          containerPort: 9411
+          protocol: TCP
+        env:
+        - name: SPAN_STORAGE_TYPE
+          value: elasticsearch
+        - name: ES_SERVER_URLS
+          value: http://elasticsearch.kmp-observability.svc.cluster.local:9200
+        - name: ES_USERNAME
+          value: ""
+        - name: ES_PASSWORD
+          value: ""
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 14269
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 14269
+          initialDelaySeconds: 10
+          periodSeconds: 10
+
+---
+# Jaeger Query Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-query
+  namespace: kmp-observability
+  labels:
+    app: jaeger-query
+    app.kubernetes.io/name: jaeger
+    app.kubernetes.io/component: query
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 16686
+    targetPort: 16686
+    protocol: TCP
+  - name: grpc
+    port: 16685
+    targetPort: 16685
+    protocol: TCP
+  selector:
+    app: jaeger-query
+
+---
+# Jaeger Query Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger-query
+  namespace: kmp-observability
+  labels:
+    app: jaeger-query
+    app.kubernetes.io/name: jaeger
+    app.kubernetes.io/component: query
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: jaeger-query
+  template:
+    metadata:
+      labels:
+        app: jaeger-query
+        app.kubernetes.io/name: jaeger
+        app.kubernetes.io/component: query
+    spec:
+      containers:
+      - name: jaeger-query
+        image: jaegertracing/jaeger-query:1.51.0
+        imagePullPolicy: IfNotPresent
+        args:
+        - --es.server-urls=http://elasticsearch.kmp-observability.svc.cluster.local:9200
+        - --span-storage.type=elasticsearch
+        - --log-level=info
+        - --query.static-files=/go/jaeger-ui/
+        ports:
+        - name: http
+          containerPort: 16686
+          protocol: TCP
+        - name: grpc
+          containerPort: 16685
+          protocol: TCP
+        env:
+        - name: SPAN_STORAGE_TYPE
+          value: elasticsearch
+        - name: ES_SERVER_URLS
+          value: http://elasticsearch.kmp-observability.svc.cluster.local:9200
+        - name: ES_USERNAME
+          value: ""
+        - name: ES_PASSWORD
+          value: ""
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 16687
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 16687
+          initialDelaySeconds: 10
+          periodSeconds: 10
+
+---
+# Ingress for Jaeger UI
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jaeger-ui
+  namespace: kmp-observability
+  labels:
+    app: jaeger-query
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - jaeger.kmp-supply-chain.local
+    secretName: jaeger-tls
+  rules:
+  - host: jaeger.kmp-supply-chain.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: jaeger-query
+            port:
+              number: 16686 

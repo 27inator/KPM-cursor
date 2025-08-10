@@ -1,0 +1,224 @@
+# ====================================
+# KMP SUPPLY CHAIN - ELASTICSEARCH
+# Centralized logging backend
+# ====================================
+
+# Namespace for observability stack
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kmp-observability
+  labels:
+    name: kmp-observability
+    app.kubernetes.io/name: kmp-observability
+
+---
+# Service Account for Elasticsearch
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: elasticsearch
+  namespace: kmp-observability
+  labels:
+    app: elasticsearch
+
+---
+# ConfigMap for Elasticsearch configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elasticsearch-config
+  namespace: kmp-observability
+  labels:
+    app: elasticsearch
+data:
+  elasticsearch.yml: |
+    cluster.name: kmp-elasticsearch
+    node.name: ${HOSTNAME}
+    node.data: true
+    node.master: true
+    node.ingest: true
+    
+    network.host: 0.0.0.0
+    http.port: 9200
+    transport.port: 9300
+    
+    discovery.seed_hosts: ["elasticsearch-0.elasticsearch-headless", "elasticsearch-1.elasticsearch-headless", "elasticsearch-2.elasticsearch-headless"]
+    cluster.initial_master_nodes: ["elasticsearch-0", "elasticsearch-1", "elasticsearch-2"]
+    
+    # Security (disabled for simplicity, enable in production)
+    xpack.security.enabled: false
+    xpack.monitoring.collection.enabled: true
+    
+    # Performance settings
+    bootstrap.memory_lock: true
+    indices.memory.index_buffer_size: 30%
+    
+    # Logging settings
+    action.destructive_requires_name: true
+    
+  jvm.options: |
+    -Xms2g
+    -Xmx2g
+    -XX:+UseG1GC
+    -XX:G1HeapRegionSize=16m
+    -XX:+DisableExplicitGC
+    -XX:+AlwaysPreTouch
+    -Xss1m
+    -Djava.awt.headless=true
+    -Dfile.encoding=UTF-8
+    -Djna.nosys=true
+    -XX:-OmitStackTraceInFastThrow
+    -Dio.netty.noUnsafe=true
+    -Dio.netty.noKeySetOptimization=true
+    -Dio.netty.recycler.maxCapacityPerThread=0
+    -Dlog4j.shutdownHookEnabled=false
+    -Dlog4j2.disable.jmx=true
+    -Djava.io.tmpdir=${ES_TMPDIR}
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:HeapDumpPath=data
+    -XX:ErrorFile=logs/hs_err_pid%p.log
+
+---
+# Headless Service for Elasticsearch cluster discovery
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch-headless
+  namespace: kmp-observability
+  labels:
+    app: elasticsearch
+spec:
+  clusterIP: None
+  ports:
+  - name: transport
+    port: 9300
+    targetPort: 9300
+  - name: http
+    port: 9200
+    targetPort: 9200
+  selector:
+    app: elasticsearch
+
+---
+# Service for Elasticsearch client access
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  namespace: kmp-observability
+  labels:
+    app: elasticsearch
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 9200
+    targetPort: 9200
+    protocol: TCP
+  selector:
+    app: elasticsearch
+
+---
+# StatefulSet for Elasticsearch cluster
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch
+  namespace: kmp-observability
+  labels:
+    app: elasticsearch
+spec:
+  serviceName: elasticsearch-headless
+  replicas: 3
+  selector:
+    matchLabels:
+      app: elasticsearch
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+    spec:
+      serviceAccountName: elasticsearch
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+      initContainers:
+      - name: fix-permissions
+        image: busybox:1.35
+        command: ['sh', '-c', 'chown -R 1000:1000 /usr/share/elasticsearch/data']
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: data
+          mountPath: /usr/share/elasticsearch/data
+      - name: increase-vm-max-map
+        image: busybox:1.35
+        command: ['sysctl', '-w', 'vm.max_map_count=262144']
+        securityContext:
+          privileged: true
+      containers:
+      - name: elasticsearch
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 9200
+          protocol: TCP
+        - name: transport
+          containerPort: 9300
+          protocol: TCP
+        env:
+        - name: ES_JAVA_OPTS
+          value: "-Xms2g -Xmx2g"
+        - name: ELASTIC_PASSWORD
+          value: "kmp_elastic_password_2024"
+        - name: discovery.type
+          value: zen
+        resources:
+          requests:
+            memory: "3Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        volumeMounts:
+        - name: data
+          mountPath: /usr/share/elasticsearch/data
+        - name: config
+          mountPath: /usr/share/elasticsearch/config/elasticsearch.yml
+          subPath: elasticsearch.yml
+        - name: config
+          mountPath: /usr/share/elasticsearch/config/jvm.options
+          subPath: jvm.options
+        readinessProbe:
+          httpGet:
+            path: /_cluster/health
+            port: 9200
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /_cluster/health
+            port: 9200
+            scheme: HTTP
+          initialDelaySeconds: 90
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+      volumes:
+      - name: config
+        configMap:
+          name: elasticsearch-config
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: "fast-ssd"
+      resources:
+        requests:
+          storage: 50Gi 

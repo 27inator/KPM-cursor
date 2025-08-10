@@ -1,0 +1,37 @@
+#!/usr/bin/expect -f
+
+set timeout 10
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+log_user 1
+
+puts "🧪 QUICK KASPA-CLI CONNECTION TEST"
+puts "================================="
+
+spawn $kaspa_cli
+expect "$ "
+
+puts "🔌 Testing connection to local node..."
+send "server 127.0.0.1:17210\r"
+expect "$ "
+
+send "connect\r"
+expect {
+    "Connected" {
+        puts "✅ kaspa-cli connected successfully!"
+        send "ping\r"
+        expect "$ "
+        puts "✅ Node is responding!"
+    }
+    "Error" {
+        puts "❌ kaspa-cli connection failed"
+    }
+    timeout {
+        puts "⏳ Connection timed out"
+    }
+}
+
+send "exit\r"
+expect eof
+
+puts "✅ CLI test complete" 

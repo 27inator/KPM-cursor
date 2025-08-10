@@ -1,0 +1,100 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "KMP Supply Chain Overview",
+    "tags": ["kmp", "supply-chain", "blockchain"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "API Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{job=\"kmp-message-bus\"}[5m])",
+            "legendFormat": "{{method}} {{status_code}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "yAxes": [
+          {"label": "Requests/sec", "min": 0}
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Response Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_ms_bucket{job=\"kmp-message-bus\"}[5m]))",
+            "legendFormat": "95th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(http_request_duration_ms_bucket{job=\"kmp-message-bus\"}[5m]))",
+            "legendFormat": "Median"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "yAxes": [
+          {"label": "Milliseconds", "min": 0}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Database Connections",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "pg_stat_database_numbackends{job=\"kmp-postgres\"}",
+            "legendFormat": "Active Connections"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Supply Chain Events/Hour",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "increase(supply_chain_events_total{job=\"kmp-message-bus\"}[1h])",
+            "legendFormat": "Events"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Blockchain Transactions",
+        "type": "singlestat",
+        "targets": [
+          {
+            "expr": "increase(blockchain_transactions_total{job=\"kmp-message-bus\"}[1h])",
+            "legendFormat": "Transactions"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 8}
+      },
+      {
+        "id": 6,
+        "title": "System Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes{job=\"kmp-message-bus\"}",
+            "legendFormat": "Message Bus"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+        "yAxes": [
+          {"label": "Bytes", "min": 0}
+        ]
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "10s"
+  }
+} 

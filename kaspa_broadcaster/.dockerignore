@@ -1,0 +1,36 @@
+# Rust
+target/
+Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS  
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Docker
+Dockerfile*
+.dockerignore
+
+# Test data
+*.json
+*.txt
+
+# Build artifacts
+*.exp 

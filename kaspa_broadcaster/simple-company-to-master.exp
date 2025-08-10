@@ -1,0 +1,146 @@
+#!/usr/bin/expect -f
+
+set timeout 30
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+# Supply chain event (conceptual for now)
+set supply_chain_event {{"event":"SCAN","product":"LW001","batch":"Q1_001","quality":"AAA","temp":"72F"}}
+
+# Wallet details
+set company_mnemonic "source tell gauge nature fatal mother glare pill raccoon kiwi acoustic parrot"
+set wallet_password "27inatorA?"
+set master_address "kaspatest:qpxm5tpyg8p6z7f6hy9mtlwz2es03cqtavaldsctcdltmnz6yfz6gvurgpmem"
+set send_amount "0.001"
+
+log_user 1
+
+puts "🚀 SIMPLE COMPANY → MASTER TRANSACTION TEST"
+puts "==========================================="
+puts "Supply chain data (80 bytes): $supply_chain_event"
+puts "To Master: $master_address"
+puts "Amount: $send_amount KAS"
+puts ""
+
+spawn $kaspa_cli
+expect "$ "
+
+puts "🔌 Connecting to local node..."
+send "server 127.0.0.1:17210\r"
+expect "$ "
+
+send "connect\r"
+expect {
+    "Connected" {
+        puts "✅ Connected!"
+    }
+    "Error" {
+        puts "❌ Connection failed"
+        exit 1
+    }
+}
+expect "$ "
+
+puts "🔑 Importing company wallet..."
+send "wallet import\r"
+expect {
+    "Are you sure you want to overwrite it" {
+        send "y\r"
+        expect "Mnemonic:"
+        send "$company_mnemonic\r"
+    }
+    "Mnemonic:" {
+        send "$company_mnemonic\r"
+    }
+}
+
+# Handle the wallet creation process
+expect {
+    "Create phishing hint" {
+        send "\r"
+        expect "Enter wallet encryption password:"
+        send "$wallet_password\r"
+        expect "Re-enter wallet encryption password:"
+        send "$wallet_password\r"
+        expect {
+            "Enter bip39 mnemonic passphrase" {
+                send "\r"
+                expect "$ "
+                puts "✅ Company wallet imported!"
+            }
+            "$ " {
+                puts "✅ Company wallet imported!"
+            }
+        }
+    }
+    "Enter wallet encryption password:" {
+        send "$wallet_password\r"
+        expect "Re-enter wallet encryption password:"
+        send "$wallet_password\r"
+        expect {
+            "Enter bip39 mnemonic passphrase" {
+                send "\r"
+                expect "$ "
+                puts "✅ Company wallet imported!"
+            }
+            "$ " {
+                puts "✅ Company wallet imported!"
+            }
+        }
+    }
+}
+
+puts "💰 Checking balance..."
+send "list\r"
+expect "$ "
+
+puts "📍 Getting address..."
+send "address\r"
+expect "$ "
+
+puts ""
+puts "🚀 SENDING COMPANY → MASTER TRANSACTION..."
+puts "========================================"
+
+send "send $send_amount $master_address\r"
+expect {
+    "Enter payment password:" {
+        send "$company_mnemonic\r"
+    }
+    "Transaction submitted" {
+        puts "✅ No password needed - transaction submitted!"
+    }
+}
+
+expect {
+    "Transaction submitted" {
+        expect -re "Transaction ID: (\[a-f0-9\]+)" {
+            set tx_id $expect_out(1,string)
+            puts ""
+            puts "🎉 SUCCESS! COMPANY → MASTER TRANSACTION SUBMITTED!"
+            puts "=================================================="
+            puts "📋 Transaction ID: $tx_id"
+            puts "🌐 Explorer: https://explorer-tn10.kaspa.org/txs/$tx_id"
+            puts "💰 Amount: $send_amount KAS"
+            puts "📦 Conceptual supply chain data: $supply_chain_event"
+            puts ""
+            puts "✅ VITAL PLUMBING WORKING!"
+            puts "🔧 Next: Add OP_RETURN data embedding to this working flow"
+        }
+    }
+    "insufficient" {
+        puts "❌ Insufficient funds"
+        exit 1
+    }
+    "Error" {
+        puts "❌ Transaction failed"
+        exit 1
+    }
+}
+
+expect "$ "
+
+send "exit\r"
+expect eof
+
+puts ""
+puts "🚀 READY TO ADD OP_RETURN DATA TO THIS WORKING TRANSACTION!" 

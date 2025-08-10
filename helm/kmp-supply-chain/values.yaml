@@ -1,0 +1,217 @@
+# ====================================
+# KMP SUPPLY CHAIN - HELM VALUES
+# Environment-specific configurations
+# ====================================
+
+# Global settings
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+
+# Application settings
+app:
+  name: kmp-supply-chain
+  environment: production
+
+# Message Bus API configuration
+messageBus:
+  enabled: true
+  replicaCount: 3
+  
+  image:
+    repository: kmp/message-bus
+    tag: "latest"
+    pullPolicy: Always
+  
+  service:
+    type: ClusterIP
+    port: 4000
+    targetPort: 4000
+  
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    hosts:
+      - host: api.kmp-supply-chain.local
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: kmp-api-tls
+        hosts:
+          - api.kmp-supply-chain.local
+  
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  
+  env:
+    NODE_ENV: production
+    PORT: "4000"
+    LOG_LEVEL: info
+    KASPA_NETWORK: testnet
+
+# Kaspa Broadcaster configuration
+kaspaBroadcaster:
+  enabled: true
+  replicaCount: 1
+  
+  image:
+    repository: kmp/kaspa-broadcaster
+    tag: "latest"
+    pullPolicy: Always
+  
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+  
+  env:
+    RUST_LOG: info
+
+# PostgreSQL configuration
+postgresql:
+  enabled: true
+  architecture: standalone
+  
+  auth:
+    postgresPassword: "kmp_secure_password_2024"
+    username: "kmp_user"
+    password: "kmp_secure_password_2024"
+    database: "kmp_supply_chain"
+  
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: ""
+    
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "200m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+
+# Redis configuration
+redis:
+  enabled: true
+  architecture: standalone
+  
+  auth:
+    enabled: false
+  
+  master:
+    persistence:
+      enabled: true
+      size: 5Gi
+    
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+
+# Monitoring configuration
+monitoring:
+  prometheus:
+    enabled: true
+    service:
+      port: 9090
+    persistence:
+      enabled: true
+      size: 10Gi
+  
+  grafana:
+    enabled: true
+    adminPassword: "kmp_admin_2024"
+    service:
+      port: 3000
+    persistence:
+      enabled: true
+      size: 2Gi
+
+# Storage configuration
+storage:
+  persistence:
+    enabled: true
+    storageClass: ""
+    accessMode: ReadWriteMany
+    size: 10Gi
+
+# Security configuration
+security:
+  networkPolicies:
+    enabled: true
+  
+  podSecurityPolicy:
+    enabled: true
+  
+  secrets:
+    create: true
+    jwtSecret: "kmp_jwt_super_secure_secret_key_2024_production"
+    walletMnemonic: "mutual alley control inspire cloth alcohol venture invite decade floor crawl sail"
+    walletAddress: "kaspatest:qpxm5tpyg8p6z7f6hy9mtlwz2es03cqtavaldsctcdltmnz6yfz6gvurgpmem"
+
+# Environment-specific overrides
+environments:
+  development:
+    messageBus:
+      replicaCount: 1
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "256Mi"
+          cpu: "200m"
+    postgresql:
+      primary:
+        persistence:
+          size: 5Gi
+    monitoring:
+      prometheus:
+        persistence:
+          size: 2Gi
+  
+  staging:
+    messageBus:
+      replicaCount: 2
+    postgresql:
+      primary:
+        persistence:
+          size: 10Gi
+  
+  production:
+    messageBus:
+      replicaCount: 3
+      autoscaling:
+        enabled: true
+    postgresql:
+      primary:
+        persistence:
+          size: 50Gi
+    security:
+      networkPolicies:
+        enabled: true 

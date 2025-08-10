@@ -1,0 +1,40 @@
+{
+  "masterWallet": {
+    "address": "kaspatest:qrzv8r278e8gsv9kp45ay8dckxdvwssadk2jaaafm929hedzm93h7jcg9k77w",
+    "derivationIndex": 0,
+    "explorerUrl": "https://explorer-tn10.kaspa.org/addresses/kaspatest:qrzv8r278e8gsv9kp45ay8dckxdvwssadk2jaaafm929hedzm93h7jcg9k77w"
+  },
+  "companyWallets": [
+    {
+      "companyId": "fresh-test-company",
+      "derivationIndex": 1,
+      "address": "kaspatest:qzc74mqe8s04ctn8pvkgxdnn0u3t7nnrvzmelmca7557p6mlswusczgw4wtca",
+      "privateKeyHex": "6702def16392b6c893fadeea07c86e73fcdaa2a9651aabb1a6fc9ebc709b79e0",
+      "explorerUrl": "https://explorer-tn10.kaspa.org/addresses/kaspatest:qzc74mqe8s04ctn8pvkgxdnn0u3t7nnrvzmelmca7557p6mlswusczgw4wtca"
+    },
+    {
+      "companyId": "explorer-test-company",
+      "derivationIndex": 2,
+      "address": "kaspatest:qzfednt5d56k5n5kqculyd6z6y748qj0ufw0pak7uqrtj5euqt8wxgmpchurp",
+      "privateKeyHex": "bff98b4b0c5a14267b83a9cc2995f99c8d45da2be1c185e608f9938d405f8f07",
+      "explorerUrl": "https://explorer-tn10.kaspa.org/addresses/kaspatest:qzfednt5d56k5n5kqculyd6z6y748qj0ufw0pak7uqrtj5euqt8wxgmpchurp"
+    },
+    {
+      "companyId": "acme-manufacturing",
+      "derivationIndex": 3,
+      "address": "kaspatest:qqpuxj2jac67rn0yjqy9p7l0sfxd5y7aljxgna0ejnkj0fk0nelp2p7z5lqm2",
+      "privateKeyHex": "42d6179b79f6ed2ffe5816adf510efcfd00d916582eb8589d7e79c5a23de06f4",
+      "explorerUrl": "https://explorer-tn10.kaspa.org/addresses/kaspatest:qqpuxj2jac67rn0yjqy9p7l0sfxd5y7aljxgna0ejnkj0fk0nelp2p7z5lqm2"
+    },
+    {
+      "companyId": "luxury-jewelers-inc",
+      "derivationIndex": 4,
+      "address": "kaspatest:qqytzaxy4zytfqfpvwjk9egum08l3k4qyfdnxhvm42nka590khjwwtx00ngyk",
+      "privateKeyHex": "fd5c8bb8e83a7de36d1b0c5573f09dd8b3e33c6d97f7c4387323634b7d4c94b0",
+      "explorerUrl": "https://explorer-tn10.kaspa.org/addresses/kaspatest:qqytzaxy4zytfqfpvwjk9egum08l3k4qyfdnxhvm42nka590khjwwtx00ngyk"
+    }
+  ],
+  "method": "HD derivation using same working method as master wallet",
+  "mnemonic": "MASTER_MNEMONIC (stored in env)",
+  "timestamp": "2025-07-25T21:48:20.205Z"
+}

@@ -1,0 +1,41 @@
+#!/usr/bin/expect -f
+
+set timeout 60
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+log_user 1
+
+puts "🔒 CREATING ONE ISOLATED WALLET"
+puts "==============================="
+
+spawn $kaspa_cli
+expect "$ "
+
+puts "Starting wallet creation..."
+send "wallet create --testnet-10\r"
+
+puts "Waiting for prompts..."
+expect {
+    "Default account title:" {
+        puts "✅ Got account title prompt"
+        send "fresh-test-company\r"
+    }
+    timeout {
+        puts "❌ Timeout waiting for account title"
+        exit 1
+    }
+}
+
+puts "Looking for more output..."
+expect {
+    -re ".*" {
+        puts "OUTPUT: $expect_out(0,string)"
+        exp_continue
+    }
+    timeout {
+        puts "Done waiting"
+    }
+}
+
+send "exit\r"
+expect eof 

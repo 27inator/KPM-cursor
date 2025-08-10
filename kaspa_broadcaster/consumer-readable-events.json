@@ -1,0 +1,89 @@
+{
+  "consumerReadableEvents": [
+    {
+      "event": "MANUFACTURING_COMPLETE",
+      "product": "LUXURY_WATCH_LW001",
+      "batch": "SWISS_2024_Q1_001",
+      "quality": "AAA_GRADE",
+      "certifier": "SWISS_CERTIFIED",
+      "location": "GENEVA_WORKSHOP"
+    },
+    {
+      "event": "QUALITY_INSPECTION", 
+      "product": "DIAMOND_RING_DR445",
+      "batch": "ANTWERP_2024_B12",
+      "quality": "FLAWLESS",
+      "grade": "VVS1_CLARITY",
+      "inspector": "GIA_CERTIFIED"
+    },
+    {
+      "event": "SHIPPING_DEPARTURE",
+      "product": "LUXURY_BAG_LB229", 
+      "batch": "ITALY_2024_SPRING",
+      "from": "FLORENCE_ATELIER",
+      "to": "NYC_FLAGSHIP",
+      "carrier": "FEDEX_PRIORITY"
+    },
+    {
+      "event": "CUSTOMS_CLEARANCE",
+      "product": "LUXURY_BAG_LB229",
+      "batch": "ITALY_2024_SPRING", 
+      "location": "JFK_CUSTOMS",
+      "status": "CLEARED",
+      "duty_paid": "CONFIRMED"
+    },
+    {
+      "event": "RETAIL_ARRIVAL",
+      "product": "LUXURY_BAG_LB229",
+      "batch": "ITALY_2024_SPRING",
+      "store": "TIFFANY_NYC_5TH_AVE", 
+      "condition": "PERFECT",
+      "shelf_ready": "YES"
+    },
+    {
+      "event": "AUTHENTICITY_VERIFIED",
+      "product": "ROLEX_SUB_RS001",
+      "batch": "ROLEX_2024_SERIES_A",
+      "store": "AUTHORIZED_DEALER_NYC",
+      "customer": "VERIFIED_PURCHASE",
+      "warranty": "ACTIVATED_5_YEARS"
+    },
+    {
+      "event": "CUSTOMER_PURCHASE",
+      "product": "ROLEX_SUB_RS001", 
+      "batch": "ROLEX_2024_SERIES_A",
+      "store": "AUTHORIZED_DEALER_NYC",
+      "price": "USD_12500",
+      "payment": "VERIFIED"
+    }
+  ],
+  "compactEvents": [
+    {
+      "event": "SCAN",
+      "product": "LW001", 
+      "batch": "Q1_001",
+      "quality": "AAA",
+      "temp": "72F"
+    },
+    {
+      "event": "MOVE",
+      "product": "LB229",
+      "batch": "SPRING", 
+      "from": "FLORENCE",
+      "to": "NYC"
+    },
+    {
+      "event": "VERIFY", 
+      "product": "RS001",
+      "batch": "SERIES_A",
+      "store": "NYC_AUTH",
+      "status": "AUTHENTIC"
+    }
+  ],
+  "eventSizes": {
+    "full_consumer_readable": "~120-150 bytes",
+    "compact_consumer_readable": "~60-80 bytes", 
+    "cost_per_event": "~0.00008 KAS",
+    "cost_1000_events": "~0.08 KAS ($0.016 USD)"
+  }
+} 

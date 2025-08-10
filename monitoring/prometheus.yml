@@ -1,0 +1,77 @@
+# ====================================
+# KMP SUPPLY CHAIN - PROMETHEUS CONFIG
+# Metrics collection configuration
+# ====================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "rules/*.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+scrape_configs:
+  # ====================================
+  # PROMETHEUS SELF-MONITORING
+  # ====================================
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ====================================
+  # KMP MESSAGE BUS API
+  # ====================================
+  - job_name: 'kmp-message-bus'
+    static_configs:
+      - targets: ['message-bus:4000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # ====================================
+  # POSTGRESQL DATABASE
+  # ====================================
+  - job_name: 'kmp-postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 30s
+
+  # ====================================
+  # REDIS CACHE
+  # ====================================
+  - job_name: 'kmp-redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 30s
+
+  # ====================================
+  # KASPA NODE MONITORING
+  # ====================================
+  - job_name: 'kmp-kaspa-node'
+    static_configs:
+      - targets: ['kaspa-node:16110']
+    metrics_path: '/metrics'
+    scrape_interval: 60s
+    scrape_timeout: 10s
+
+  # ====================================
+  # DOCKER CONTAINER METRICS
+  # ====================================
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 30s
+
+  # ====================================
+  # NODE EXPORTER (System Metrics)
+  # ====================================
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s 

@@ -1,0 +1,111 @@
+#!/usr/bin/expect -f
+
+set timeout 60
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+log_user 1
+
+puts "🔒 COMPLETE FIXED WALLET CREATOR"
+puts "==============================="
+puts "Now handling wallet encryption password!"
+
+spawn $kaspa_cli
+expect "$ "
+
+send "wallet create --testnet-10\r"
+
+# Step 1: Account title
+expect "Default account title:"
+send "complete-fixed-test\r"
+puts "✅ Account title sent"
+
+# Step 2: Phishing hint
+expect "Create phishing hint (optional, press <enter> to skip):"
+send "\r"
+puts "✅ Phishing hint skipped"
+
+# Step 3: NEW - Handle wallet encryption password
+expect "Enter wallet encryption password:"
+send "testpassword\r"
+puts "✅ Encryption password sent"
+
+# Step 4: Confirm password
+expect {
+    "Confirm wallet encryption password:" {
+        send "testpassword\r"
+        puts "✅ Password confirmed"
+    }
+    "Enter wallet encryption password:" {
+        send "testpassword\r"
+        puts "✅ Password re-entered"
+    }
+    timeout {
+        puts "⚠️  No password confirmation prompt"
+    }
+}
+
+# Step 5: Look for mnemonic
+puts "🔑 Looking for mnemonic..."
+expect {
+    -re "Your mnemonic phrase: (.+)" {
+        set mnemonic [string trim $expect_out(1,string)]
+        puts "✅ Mnemonic found: [string range $mnemonic 0 30]..."
+        set success 1
+    }
+    -re "Mnemonic phrase: (.+)" {
+        set mnemonic [string trim $expect_out(1,string)]
+        puts "✅ Mnemonic found: [string range $mnemonic 0 30]..."
+        set success 1
+    }
+    -re "(.+)" {
+        puts "CHECKING: $expect_out(1,string)"
+        if {[string match "*mnemonic*" $expect_out(1,string)] || [string match "*phrase*" $expect_out(1,string)]} {
+            puts "🔑 Found mnemonic reference!"
+        }
+        exp_continue
+    }
+    timeout {
+        puts "❌ Still no mnemonic after password"
+        set success 0
+    }
+}
+
+if {[info exists success] && $success == 1} {
+    # Step 6: Get address
+    expect "$ "
+    send "wallet address --testnet-10\r"
+    
+    expect {
+        -re "(kaspatest:\[a-z0-9\]+)" {
+            set address $expect_out(1,string)
+            puts "🎉 COMPLETE SUCCESS!"
+            puts "📍 Address: $address"
+            puts "🔑 Mnemonic: [string range $mnemonic 0 40]..."
+            puts "🌐 Explorer: https://explorer-tn10.kaspa.org/addresses/$address"
+            
+            # Save complete result
+            set fp [open "complete_wallet_success.txt" w]
+            puts $fp "COMPLETE WALLET SUCCESS!"
+            puts $fp "======================="
+            puts $fp "Company: complete-fixed-test"
+            puts $fp "Address: $address"
+            puts $fp "Mnemonic: $mnemonic"
+            puts $fp "Password: testpassword"
+            puts $fp "Explorer: https://explorer-tn10.kaspa.org/addresses/$address"
+            close $fp
+            
+            puts "💾 SUCCESS saved to: complete_wallet_success.txt"
+        }
+        timeout {
+            puts "❌ No address"
+        }
+    }
+} else {
+    puts "❌ Failed to get mnemonic"
+}
+
+send "exit\r"
+expect eof
+
+puts ""
+puts "🎯 WALLET CREATION ANALYSIS COMPLETE!" 

@@ -1,0 +1,28 @@
+node_modules
+
+# KPM lean repo excludes
+rusty-kaspa/
+pea_sdk/
+server/services/kaspa-wasm32-sdk/
+kmp-cursor-export-minimal/server/services/kaspa-wasm32-sdk/
+dist/
+**/node_modules/
+kaspa-logs/
+kaspa-logs-fresh/
+**/target/
+*.log
+*.tar.gz
+*.zip
+# KPM lean repo excludes
+rusty-kaspa/
+pea_sdk/
+server/services/kaspa-wasm32-sdk/
+kmp-cursor-export-minimal/server/services/kaspa-wasm32-sdk/
+dist/
+**/node_modules/
+kaspa-logs/
+kaspa-logs-fresh/
+**/target/
+*.log
+*.tar.gz
+*.zip

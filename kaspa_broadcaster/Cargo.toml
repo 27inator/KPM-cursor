@@ -1,0 +1,27 @@
+[package]
+name = "kaspa-op-return-submitter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+secp256k1 = "0.29"
+sha2 = "0.10"
+hex = "0.4"
+hmac = "0.12"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+ahash = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+
+# Local kaspa dependencies (using relative paths)
+kaspa-addresses = { path = "../rusty-kaspa/crypto/addresses" }
+kaspa-consensus-core = { path = "../rusty-kaspa/consensus/core" }
+kaspa-consensus-client = { path = "../rusty-kaspa/consensus/client", features = ["wasm32-sdk"] }
+kaspa-txscript = { path = "../rusty-kaspa/crypto/txscript" }
+kaspa-rpc-core = { path = "../rusty-kaspa/rpc/core" }
+kaspa-grpc-client = { path = "../rusty-kaspa/rpc/grpc/client" }
+kaspa-notify = { path = "../rusty-kaspa/notify" }
+kaspa-core = { path = "../rusty-kaspa/core" }
+kaspa-bip32 = { path = "../rusty-kaspa/wallet/bip32" }
+kaspa-wallet-core = { path = "../rusty-kaspa/wallet/core" } 

@@ -1,0 +1,7 @@
+ISOLATED COMPANY WALLETS - FINAL
+================================
+Master: kaspatest:qpxm5tpyg8p6z7f6hy9mtlwz2es03cqtavaldsctcdltmnz6yfz6gvurgpmem
+Master Mnemonic: arrest acid fall interest comfort expire aunt combine actor tackle stove coral
+
+COMPANIES (Format: CompanyID|Address|UniqueMnemonic):
+

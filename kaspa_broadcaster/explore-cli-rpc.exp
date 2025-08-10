@@ -1,0 +1,89 @@
+#!/usr/bin/expect -f
+
+set timeout 30
+set kaspa_cli "../rusty-kaspa/target/release/kaspa-cli"
+
+log_user 1
+
+puts "🔍 EXPLORING KASPA-CLI RPC FOR OP_RETURN TRANSACTIONS"
+puts "==================================================="
+
+spawn $kaspa_cli
+expect "$ "
+
+puts "🔌 Connecting to local node..."
+send "server 127.0.0.1:17210\r"
+expect "$ "
+
+send "connect\r"
+expect {
+    "Connected" {
+        puts "✅ Connected!"
+    }
+    "Error" {
+        puts "❌ Connection failed"
+        exit 1
+    }
+}
+expect "$ "
+
+puts ""
+puts "🔍 EXPLORING RPC COMMANDS..."
+puts "============================"
+
+# Check RPC help
+puts "Checking RPC help..."
+send "help rpc\r"
+expect "$ "
+
+puts ""
+puts "Trying 'rpc' command directly..."
+send "rpc\r"
+expect "$ "
+
+puts ""
+puts "Checking if we can call RPC methods..."
+send "rpc help\r"
+expect "$ "
+
+puts ""
+puts "Trying to call getInfo via RPC..."
+send "rpc getInfo\r"
+expect "$ "
+
+puts ""
+puts "🧪 TESTING TRANSACTION CREATION METHODS..."
+puts "=========================================="
+
+# Check for transaction creation methods
+puts "Looking for transaction creation methods..."
+send "rpc getBlockTemplate\r"
+expect "$ "
+
+puts ""
+puts "Trying createRawTransaction..."
+send "rpc createRawTransaction\r"
+expect "$ "
+
+puts ""
+puts "Trying submitTransaction..."
+send "rpc submitTransaction\r"
+expect "$ "
+
+puts ""
+puts "🔍 EXPLORING ALL RPC METHODS..."
+puts "==============================="
+
+# Get list of available RPC methods
+puts "Getting RPC method list..."
+send "rpc\r"
+expect "$ "
+
+puts ""
+puts "📋 RPC EXPLORATION COMPLETE"
+puts "==========================="
+
+send "exit\r"
+expect eof
+
+puts "✅ CLI RPC exploration finished" 

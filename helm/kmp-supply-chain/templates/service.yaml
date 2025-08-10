@@ -1,0 +1,20 @@
+{{- if .Values.messageBus.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kmp-supply-chain.fullname" . }}-message-bus
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kmp-supply-chain.labels" . | nindent 4 }}
+    app.kubernetes.io/component: message-bus
+spec:
+  type: {{ .Values.messageBus.service.type }}
+  ports:
+  - port: {{ .Values.messageBus.service.port }}
+    targetPort: {{ .Values.messageBus.service.targetPort }}
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "kmp-supply-chain.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: message-bus
+{{- end }} 
