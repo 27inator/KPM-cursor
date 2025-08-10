@@ -6,6 +6,9 @@ on:
       - 'v*'
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   build-and-package:
     name: Build and Package (${{ matrix.os }})
