@@ -62,29 +62,29 @@ jobs:
               ;;
           esac
 
-      - name: Import GPG key (if provided)
-        if: ${{ env.HAVE_GPG == '1' }}
-        uses: crazy-max/ghaction-import-gpg@v6
-        with:
-          gpg_private_key: ${{ env.GPG_PRIVATE_KEY }}
-          passphrase: ${{ env.GPG_PASSPHRASE }}
-        env:
-          HAVE_GPG: ${{ secrets.GPG_PRIVATE_KEY && secrets.GPG_PASSPHRASE && '1' || '0' }}
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      # - name: Import GPG key (if provided)
+      #   if: ${{ env.HAVE_GPG == '1' }}
+      #   uses: crazy-max/ghaction-import-gpg@v6
+      #   with:
+      #     gpg_private_key: ${{ env.GPG_PRIVATE_KEY }}
+      #     passphrase: ${{ env.GPG_PASSPHRASE }}
+      #   env:
+      #     HAVE_GPG: ${{ secrets.GPG_PRIVATE_KEY && secrets.GPG_PASSPHRASE && '1' || '0' }}
+      #     GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+      #     GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
-      - name: Sign artifacts (if key present)
-        if: ${{ env.HAVE_GPG == '1' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          for f in dist/*.{tar.gz,zip}; do
-            [ -e "$f" ] || continue
-            gpg --batch --yes --passphrase "$GPG_PASSPHRASE" --detach-sign "$f"
-          done
-        env:
-          HAVE_GPG: ${{ secrets.GPG_PRIVATE_KEY && secrets.GPG_PASSPHRASE && '1' || '0' }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      # - name: Sign artifacts (if key present)
+      #   if: ${{ env.HAVE_GPG == '1' }}
+      #   shell: bash
+      #   run: |
+      #     set -euo pipefail
+      #     for f in dist/*.{tar.gz,zip}; do
+      #       [ -e "$f" ] || continue
+      #       gpg --batch --yes --passphrase "$GPG_PASSPHRASE" --detach-sign "$f"
+      #     done
+      #   env:
+      #     HAVE_GPG: ${{ secrets.GPG_PRIVATE_KEY && secrets.GPG_PASSPHRASE && '1' || '0' }}
+      #     GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
