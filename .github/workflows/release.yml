@@ -100,7 +100,7 @@ jobs:
           if [ -n "${{ secrets.GPG_PRIVATE_KEY }}" ]; then echo "present=1" >> "$GITHUB_OUTPUT"; else echo "present=0" >> "$GITHUB_OUTPUT"; fi
 
       - name: Import GPG private key (loopback)
-        if: ${{ steps.gpgcheck.outputs.present == '1' }}
+        if: ${{ runner.os != 'Windows' && steps.gpgcheck.outputs.present == '1' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -112,8 +112,23 @@ jobs:
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
 
-      - name: Sign artifacts
-        if: ${{ steps.gpgcheck.outputs.present == '1' }}
+      - name: Import GPG private key (Windows loopback)
+        if: ${{ runner.os == 'Windows' && steps.gpgcheck.outputs.present == '1' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $env:GNUPGHOME = "$env:USERPROFILE\.gnupg"
+          New-Item -ItemType Directory -Force -Path $env:GNUPGHOME | Out-Null
+          Set-Content -Path "$env:GNUPGHOME\gpg-agent.conf" -Value "allow-loopback-pinentry" -Encoding ascii
+          & gpgconf --kill gpg-agent
+          "$env:GPG_PRIVATE_KEY" | Out-File -FilePath "$env:RUNNER_TEMP\key.asc" -Encoding ascii -Force
+          & gpg --batch --import "$env:RUNNER_TEMP\key.asc"
+          & gpg --batch --list-secret-keys
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+
+      - name: Sign artifacts (Unix)
+        if: ${{ runner.os != 'Windows' && steps.gpgcheck.outputs.present == '1' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -121,6 +136,17 @@ jobs:
             [ -e "$f" ] || continue
             gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --armor --detach-sign "$f"
           done
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Sign artifacts (Windows)
+        if: ${{ runner.os == 'Windows' && steps.gpgcheck.outputs.present == '1' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Get-ChildItem dist -Recurse -Include *.tar.gz,*.zip,*.deb,*.rpm | ForEach-Object {
+            & gpg --batch --yes --pinentry-mode loopback --passphrase $env:GPG_PASSPHRASE --armor --detach-sign $_.FullName
+          }
         env:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
