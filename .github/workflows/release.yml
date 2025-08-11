@@ -33,7 +33,8 @@ jobs:
         working-directory: pea-agent
         run: cargo build --release
 
-      - name: Prepare artifact
+      - name: Prepare artifact (Linux)
+        if: ${{ runner.os == 'Linux' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -41,29 +42,40 @@ jobs:
           OUTDIR=pea-agent/target/release
           VERSION=${GITHUB_REF_NAME#v}
           mkdir -p dist
-          case "${{ runner.os }}" in
-            Linux)
-              BIN="$OUTDIR/$APP_NAME"
-              PKG_NAME="kpm-${APP_NAME}_${VERSION}_linux_amd64"
-              cp "$BIN" "dist/$APP_NAME"
-              (cd dist && tar -czf "${PKG_NAME}.tar.gz" "$APP_NAME")
-              (cd dist && shasum -a 256 "${PKG_NAME}.tar.gz" > "${PKG_NAME}.tar.gz.sha256")
-              ;;
-            macOS)
-              BIN="$OUTDIR/$APP_NAME"
-              PKG_NAME="kpm-${APP_NAME}_${VERSION}_macos_universal"
-              cp "$BIN" "dist/$APP_NAME"
-              (cd dist && tar -czf "${PKG_NAME}.tar.gz" "$APP_NAME")
-              (cd dist && shasum -a 256 "${PKG_NAME}.tar.gz" > "${PKG_NAME}.tar.gz.sha256")
-              ;;
-            Windows)
-              BIN="pea-agent/target/release/${APP_NAME}.exe"
-              PKG_NAME="kpm-${APP_NAME}_${VERSION}_windows_amd64"
-              cp "$BIN" dist/
-              (cd dist && powershell -c "Compress-Archive -Path ${APP_NAME}.exe -DestinationPath ${PKG_NAME}.zip")
-              (cd dist && certutil -hashfile "${PKG_NAME}.zip" SHA256 | findstr /v "hash of" | findstr /v "CertUtil" > "${PKG_NAME}.zip.sha256")
-              ;;
-          esac
+          BIN="$OUTDIR/$APP_NAME"
+          PKG_NAME="kpm-${APP_NAME}_${VERSION}_linux_amd64"
+          cp "$BIN" "dist/$APP_NAME"
+          (cd dist && tar -czf "${PKG_NAME}.tar.gz" "$APP_NAME")
+          (cd dist && shasum -a 256 "${PKG_NAME}.tar.gz" > "${PKG_NAME}.tar.gz.sha256")
+
+      - name: Prepare artifact (macOS)
+        if: ${{ runner.os == 'macOS' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_NAME=pea-agent
+          OUTDIR=pea-agent/target/release
+          VERSION=${GITHUB_REF_NAME#v}
+          mkdir -p dist
+          BIN="$OUTDIR/$APP_NAME"
+          PKG_NAME="kpm-${APP_NAME}_${VERSION}_macos_universal"
+          cp "$BIN" "dist/$APP_NAME"
+          (cd dist && tar -czf "${PKG_NAME}.tar.gz" "$APP_NAME")
+          (cd dist && shasum -a 256 "${PKG_NAME}.tar.gz" > "${PKG_NAME}.tar.gz.sha256")
+
+      - name: Prepare artifact (Windows)
+        if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $APP = "pea-agent"
+          $OUT = "pea-agent/target/release/pea-agent.exe"
+          $VERSION = $env:GITHUB_REF_NAME.TrimStart('v')
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item $OUT "dist\$APP.exe" -Force
+          $PKG = "kpm-${APP}_${VERSION}_windows_amd64"
+          Compress-Archive -Path "dist\$APP.exe" -DestinationPath "dist\$PKG.zip" -Force
+          (Get-FileHash "dist\$PKG.zip" -Algorithm SHA256).Hash | Set-Content -Path "dist\$PKG.zip.sha256"
 
       - name: Build .deb and .rpm (Linux)
         if: ${{ runner.os == 'Linux' }}
@@ -91,7 +103,11 @@ jobs:
 
       - name: Install GPG (Windows)
         if: ${{ runner.os == 'Windows' }}
-        run: choco install gnupg -y
+        shell: pwsh
+        run: |
+          choco install gnupg -y
+          $gpgPath = "C:\\Program Files\\GnuPG\\bin"
+          if (Test-Path $gpgPath) { $env:PATH = "$env:PATH;$gpgPath" }
 
       - name: Check if GPG secret present
         id: gpgcheck
@@ -144,8 +160,12 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          Get-ChildItem dist -Recurse -Include *.tar.gz,*.zip,*.deb,*.rpm | ForEach-Object {
-            & gpg --batch --yes --pinentry-mode loopback --passphrase $env:GPG_PASSPHRASE --armor --detach-sign $_.FullName
+          $gpgPath = "C:\\Program Files\\GnuPG\\bin"
+          if (Test-Path $gpgPath) { $env:PATH = "$env:PATH;$gpgPath" }
+          gpg --version
+          Get-ChildItem dist -Recurse -File | Where-Object { $_.Name -match '\.(zip|tar\.gz|deb|rpm)$' } | ForEach-Object {
+            Write-Host "Signing" $_.FullName
+            & gpg.exe --batch --yes --pinentry-mode loopback --passphrase $env:GPG_PASSPHRASE --armor --detach-sign $_.FullName
           }
         env:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
