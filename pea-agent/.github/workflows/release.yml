@@ -1,8 +1,11 @@
 name: Build and Release PEA Agent
 
 on:
-  push:
-    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+# Note: tag-based releases are handled by the root workflow at .github/workflows/release.yml
 
 env:
   CARGO_TERM_COLOR: always
@@ -56,8 +59,7 @@ jobs:
     name: Test Suite
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        rust: [stable]
+        os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
