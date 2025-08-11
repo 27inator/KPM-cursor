@@ -17,9 +17,6 @@ jobs:
       matrix:
         os: [ubuntu-latest]
     steps:
-      - name: Expose secrets to env
-        run: echo "HAVE_GPG=$([[ -n \"${{ secrets.GPG_PRIVATE_KEY }}\" ]] && echo 1 || echo 0)" >> $GITHUB_ENV
-
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -68,8 +65,14 @@ jobs:
               ;;
           esac
 
+      - name: Check if GPG secret present
+        id: gpgcheck
+        shell: bash
+        run: |
+          if [ -n "${{ secrets.GPG_PRIVATE_KEY }}" ]; then echo "present=1" >> "$GITHUB_OUTPUT"; else echo "present=0" >> "$GITHUB_OUTPUT"; fi
+
       - name: Import GPG private key (loopback)
-        if: ${{ env.HAVE_GPG == '1' }}
+        if: ${{ steps.gpgcheck.outputs.present == '1' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -83,7 +86,7 @@ jobs:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
 
       - name: Sign artifacts
-        if: ${{ env.HAVE_GPG == '1' }}
+        if: ${{ steps.gpgcheck.outputs.present == '1' }}
         shell: bash
         run: |
           set -euo pipefail
