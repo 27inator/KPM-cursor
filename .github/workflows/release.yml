@@ -15,7 +15,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -65,6 +65,34 @@ jobs:
               ;;
           esac
 
+      - name: Build .deb and .rpm (Linux)
+        if: ${{ runner.os == 'Linux' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=${GITHUB_REF_NAME#v}
+          sudo apt-get update
+          sudo apt-get install -y gnupg ruby-dev rpm build-essential
+          sudo gem install --no-document fpm
+          cargo install cargo-deb || true
+          (cd pea-agent && cargo deb)
+          mkdir -p dist
+          cp pea-agent/target/debian/*.deb dist/ || true
+          fpm -s dir -t rpm -n kpm-pea-agent -v "${VERSION}" --prefix /usr/local/bin pea-agent/target/release/pea-agent
+          mv *.rpm dist/ || true
+
+      - name: Install GPG (Linux)
+        if: ${{ runner.os == 'Linux' }}
+        run: sudo apt-get update && sudo apt-get install -y gnupg
+
+      - name: Install GPG (macOS)
+        if: ${{ runner.os == 'macOS' }}
+        run: brew install gnupg
+
+      - name: Install GPG (Windows)
+        if: ${{ runner.os == 'Windows' }}
+        run: choco install gnupg -y
+
       - name: Check if GPG secret present
         id: gpgcheck
         shell: bash
@@ -76,8 +104,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p ~/.gnupg
-          chmod 700 ~/.gnupg
+          mkdir -p ~/.gnupg && chmod 700 ~/.gnupg
           echo 'allow-loopback-pinentry' > ~/.gnupg/gpg-agent.conf
           gpgconf --kill gpg-agent || true
           echo "${GPG_PRIVATE_KEY}" | gpg --batch --import
@@ -90,7 +117,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for f in dist/*.{tar.gz,zip}; do
+          for f in dist/*.{tar.gz,zip,deb,rpm}; do
             [ -e "$f" ] || continue
             gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --armor --detach-sign "$f"
           done
@@ -113,6 +140,56 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: dist
+          merge-multiple: true
+
+      - name: Build update manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          REPO="$GITHUB_REPOSITORY"
+          TAG="$GITHUB_REF_NAME"
+          VERSION="${TAG#v}"
+          PUBLISHED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          tmp="[]"
+          shopt -s globstar nullglob
+          shacmd="sha256sum"
+          command -v sha256sum >/dev/null 2>&1 || shacmd="shasum -a 256"
+          for p in dist/**/*.{tar.gz,zip,deb,rpm} dist/*.{tar.gz,zip,deb,rpm}; do
+            [ -e "$p" ] || continue
+            f=$(basename "$p")
+            sha=$($shacmd "$p" | awk '{print $1}')
+            url="https://github.com/${REPO}/releases/download/${TAG}/${f}"
+            tmp=$(node -e "let a=${tmp}; a.push({name:'${f}', url:'${url}', sha256:'${sha}'}); console.log(JSON.stringify(a))")
+          done
+          node -e "console.log(JSON.stringify({version:'${VERSION}', publishedAt:'${PUBLISHED_AT}', artifacts:${tmp}}))" > dist/update-manifest.json
+
+      - name: Check if GPG secret present
+        id: gpgcheck_rel
+        shell: bash
+        run: |
+          if [ -n "${{ secrets.GPG_PRIVATE_KEY }}" ]; then echo "present=1" >> "$GITHUB_OUTPUT"; else echo "present=0" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Import GPG private key (loopback) for manifest
+        if: ${{ steps.gpgcheck_rel.outputs.present == '1' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.gnupg && chmod 700 ~/.gnupg
+          echo 'allow-loopback-pinentry' > ~/.gnupg/gpg-agent.conf
+          gpgconf --kill gpg-agent || true
+          echo "${GPG_PRIVATE_KEY}" | gpg --batch --import
+          gpg --batch --list-secret-keys || true
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+
+      - name: Sign update manifest
+        if: ${{ steps.gpgcheck_rel.outputs.present == '1' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$GPG_PASSPHRASE" --armor --detach-sign dist/update-manifest.json
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -156,7 +233,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for f in dist/*.{tar.gz,zip}; do
+          for f in dist/*.{tar.gz,zip,deb,rpm,json}; do
             [ -e "$f" ] || continue
             if [ -f "${f}.asc" ]; then
               gpg --verify "${f}.asc" "$f"
