@@ -123,14 +123,21 @@ jobs:
         if: ${{ runner.os == 'macOS' }}
         run: brew install gnupg
 
-      - name: Install GPG (Windows)
-        if: ${{ runner.os == 'Windows' }}
-        shell: pwsh
-        run: |
-          choco install gnupg -y
-          $gpgPath = "C:\\Program Files\\GnuPG\\bin"
-          if (Test-Path $gpgPath) { $env:PATH = "$env:PATH;$gpgPath" }
-
+        - name: Install GPG (Windows)
+          if: ${{ runner.os == 'Windows' }}
+          shell: pwsh
+          run: |
+            $ErrorActionPreference = 'Stop'
+            $ProgressPreference = 'SilentlyContinue'
+            if (Get-Command winget -ErrorAction SilentlyContinue) {
+              winget install --id GnuPG.GnuPG --silent --accept-package-agreements --accept-source-agreements
+            } else {
+              choco install gnupg --yes --no-progress --execution-timeout=5400
+            }
+            Get-Process -Name 'gnupg-w32*' -ErrorAction SilentlyContinue | Stop-Process -Force
+            $gpgPath = 'C:\Program Files\GnuPG\bin'
+            if (Test-Path $gpgPath) { $env:PATH = "$env:PATH;$gpgPath" }
+            gpg --version
       - name: Check if GPG secret present
         id: gpgcheck
         shell: bash
