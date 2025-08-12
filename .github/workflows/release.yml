@@ -123,14 +123,40 @@ jobs:
         if: ${{ runner.os == 'macOS' }}
         run: brew install gnupg
 
-      - name: Install GPG (Windows)
-        if: ${{ runner.os == 'Windows' }}
-        shell: pwsh
-        run: |
-          choco install gnupg -y
-          $gpgPath = "C:\\Program Files\\GnuPG\\bin"
-          if (Test-Path $gpgPath) { $env:PATH = "$env:PATH;$gpgPath" }
-
+        - name: Install GPG (Windows)
+          if: ${{ runner.os == 'Windows' }}
+          shell: pwsh
+          run: |
+            $ErrorActionPreference = 'Stop'
+            $ProgressPreference = 'SilentlyContinue'
+            # Stop any orphaned installers before starting
+            Get-Process -Name 'gnupg-w32*' -ErrorAction SilentlyContinue | Stop-Process -Force
+        
+            function Invoke-With-Retry {
+              param([scriptblock]$Script, [int]$Retries = 3, [int]$DelaySeconds = 15)
+              for ($i = 1; $i -le $Retries; $i++) {
+                try {
+                  & $Script
+                  if ($LASTEXITCODE -ne $null -and $LASTEXITCODE -ne 0) { throw "Command failed with exit code $LASTEXITCODE" }
+                  return
+                } catch {
+                  if ($i -eq $Retries) { throw }
+                  Write-Warning ("Attempt $i failed: $($_.Exception.Message). Retrying in ${DelaySeconds}s...")
+                  Get-Process -Name 'gnupg-w32*' -ErrorAction SilentlyContinue | Stop-Process -Force
+                  Start-Sleep -Seconds $DelaySeconds
+                }
+              }
+            }
+        
+            if (Get-Command winget -ErrorAction SilentlyContinue) {
+              Invoke-With-Retry { winget install --id GnuPG.GnuPG --silent --accept-package-agreements --accept-source-agreements }
+            } else {
+              Invoke-With-Retry { choco install gnupg --yes --no-progress --execution-timeout=5400 }
+            }
+        
+            $gpgPath = 'C:\Program Files\GnuPG\bin'
+            if (Test-Path $gpgPath) { $env:PATH = "$env:PATH;$gpgPath" }
+            gpg --version
       - name: Check if GPG secret present
         id: gpgcheck
         shell: bash
