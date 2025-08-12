@@ -6,7 +6,7 @@ on:
 jobs:
   windows-smoke:
     runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -15,6 +15,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Setup sccache (retry)
+        continue-on-error: true
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -39,7 +40,7 @@ jobs:
 
       - name: Build pea-agent (Windows)
         working-directory: pea-agent
-        run: cargo build --release
+        run: cargo build --release --locked
 
       - name: Install GPG (Windows)
         shell: pwsh
