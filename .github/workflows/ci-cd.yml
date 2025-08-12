@@ -61,8 +61,8 @@ jobs:
       env:
         DATABASE_URL: postgresql://test:test@localhost:5432/kmp_supply_chain_test
       run: |
-        npx -y drizzle-kit generate:pg
-        npx -y drizzle-kit push:pg
+        npx -y drizzle-kit generate
+        npx -y drizzle-kit push
 
     - name: 🔧 Build project
       working-directory: message_bus
@@ -113,8 +113,8 @@ jobs:
       env:
         DATABASE_URL: postgresql://test:test@localhost:5432/kmp_supply_chain_test
       run: |
-        npx -y drizzle-kit generate:pg
-        npx -y drizzle-kit push:pg
+        npx -y drizzle-kit generate
+        npx -y drizzle-kit push
 
     - name: 🚀 Start test server
       working-directory: message_bus
@@ -183,8 +183,8 @@ jobs:
       env:
         DATABASE_URL: postgresql://test:test@localhost:5432/kmp_supply_chain_test
       run: |
-        npx -y drizzle-kit generate:pg
-        npx -y drizzle-kit push:pg
+        npx -y drizzle-kit generate
+        npx -y drizzle-kit push
 
     - name: 🚀 Start test server
       working-directory: message_bus
@@ -255,8 +255,8 @@ jobs:
       env:
         DATABASE_URL: postgresql://test:test@localhost:5432/kmp_supply_chain_test
       run: |
-        npx -y drizzle-kit generate:pg
-        npx -y drizzle-kit push:pg
+        npx -y drizzle-kit generate
+        npx -y drizzle-kit push
 
     - name: 🚀 Start test server
       working-directory: message_bus
